@@ -1,7 +1,7 @@
 use const_primes::{is_prime};
-use const_guards::guard;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::mem;
+use std::ops::{Index, IndexMut};
 
 struct Entry <K, V> {
     key: K,
@@ -28,23 +28,127 @@ pub struct FixedSizeHashMap <K, V, const C: usize>  {
     _tail: usize
 }
 
-// const fn is_integral_or_string<T: ?Sized + Any>() -> bool {
-//     core::intrinsics::type_id::<T>() == core::intrinsics::type_id::<String>()
-//     || core::intrinsics::type_id::<T>() == core::intrinsics::type_id::<i32>()
-//     || core::intrinsics::type_id::<T>() == core::intrinsics::type_id::<i64>()
-//     || core::intrinsics::type_id::<T>() == core::intrinsics::type_id::<i128>()
-//     || core::intrinsics::type_id::<T>() == core::intrinsics::type_id::<u32>()
-//     || core::intrinsics::type_id::<T>() == core::intrinsics::type_id::<u64>()
-//     || core::intrinsics::type_id::<T>() == core::intrinsics::type_id::<u128>()
-// }
+struct Check<const U: bool>;
+trait IsTrue {}
+impl IsTrue for Check<true> {}
 
+pub const fn is_prime_and_within_limit(c: usize, max_cap: usize) -> bool {
+    is_prime(c as u64) && c <= max_cap
+}
 
-#[guard(is_prime(C as u64))]
-#[guard(C <= 25013)]
-impl <K: Hash + std::cmp::Eq, V, const C: usize> FixedSizeHashMap <K, V, C>  {
+impl <K: Hash + std::cmp::Eq, V, const C: usize> FixedSizeHashMap <K, V, C>
+where
+    Check<{is_prime_and_within_limit(C, 25013)}>: IsTrue,
+{
     const CAPACITY: usize = C;
 
-    fn find_index(&self, key: &K) -> usize {
+    pub fn new() -> FixedSizeHashMap<K, V, C> {
+        let mut map = FixedSizeHashMap {
+            _data: Vec::new(),
+            _size: 0,
+            _head: Self::CAPACITY,
+            _tail: Self::CAPACITY,
+        };
+        map._data.resize_with(Self::CAPACITY, Default::default);
+        map
+    }
+
+    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
+        let i = self._find_index(&key);
+        if i == Self::CAPACITY {
+            return None
+        }
+
+        let mut old_val: Option<V> = None;
+        match self._data[i].as_mut() {
+            Some(entry) => {
+                old_val = Some(mem::replace(&mut entry.value, value));
+                self._remove_from_list(i);
+                self._move_to_front_of_list(i);
+            }
+            None => {
+                let entry = Entry::new(key, value, Self::CAPACITY);
+                self._data[i] = Some(entry);
+                self._move_to_front_of_list(i);
+                self._size += 1;
+            }
+        }
+        old_val
+    }
+
+    pub fn exists(&self, key: &K) -> bool {
+        let i = self._find_index(key);
+        i != Self::CAPACITY && self._data[i].is_some()
+    }
+
+    pub fn get(&self, key: &K) -> Option<&V> {
+        let i = self._find_index(&key);
+        match self._get_at(i) {
+            Some(key_val_pair) => Some(key_val_pair.1),
+            None => None
+        }
+    }
+
+    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
+        let i = self._find_index(&key);
+
+        if i == Self::CAPACITY {
+            return None
+        }
+
+        match self._data[i].as_mut() {
+            Some(data) => Some(&mut data.value),
+            None => None
+        }
+    }
+
+    pub fn remove(&mut self, key: &K) -> Option<V> {
+        let i = self._find_index(&key);
+        if i == Self::CAPACITY {
+            return None
+        }
+   
+        match self._data[i].as_mut() {
+            None => {},
+            Some(_) => {
+                self._size -= 1;
+                self._remove_from_list(i);
+            } 
+        }
+        
+        match mem::replace(&mut self._data[i], None) {
+            None => None,
+            Some(key_val) => Some(key_val.value)
+        }
+    } 
+
+    pub const fn capacity(&self) -> usize {
+        Self::CAPACITY
+    }
+    
+    pub fn size(&self) -> usize {
+        self._size
+    }
+
+    pub fn head(&self) -> Option<(&K, &V)> {
+        self._get_at(self._head)
+    }
+
+    pub fn tail(&self) -> Option<(&K, &V)> {
+        self._get_at(self._tail)
+    }
+
+    fn _get_at(&self, i: usize) -> Option<(&K, &V)> {
+        if i == Self::CAPACITY {
+            return None
+        }
+        match self._data[i].as_ref() {
+            Some(data) => Some((&data.key, &data.value)),
+            None => None
+        }
+    }
+
+    fn _find_index(&self, key: &K) -> usize {
         let mut s = DefaultHasher::new();
         key.hash(&mut s);
         let already_visited = (s.finish() % Self::CAPACITY as u64) as usize;
@@ -58,7 +162,7 @@ impl <K: Hash + std::cmp::Eq, V, const C: usize> FixedSizeHashMap <K, V, C>  {
         index
     }
 
-    fn move_to_front_of_list(
+    fn _move_to_front_of_list(
         &mut self,
         i: usize
     ) {
@@ -78,11 +182,11 @@ impl <K: Hash + std::cmp::Eq, V, const C: usize> FixedSizeHashMap <K, V, C>  {
         }
     }
     
-    fn remove_from_list(&mut self, i: usize) {
+    fn _remove_from_list(&mut self, i: usize) {
         let entry_next: usize;
         let entry_prev: usize;
         unsafe {
-            let entry = self._data.get_unchecked_mut(i).as_ref().unwrap();
+            let entry = self._data.get_unchecked(i).as_ref().unwrap();
             entry_next = entry.next;
             entry_prev = entry.prev;
         }
@@ -105,98 +209,24 @@ impl <K: Hash + std::cmp::Eq, V, const C: usize> FixedSizeHashMap <K, V, C>  {
             self._tail = entry_prev;
         }
     }
+}
 
-    pub fn new() -> FixedSizeHashMap<K, V, C> {
-        let mut map = FixedSizeHashMap {
-            _data: Vec::new(),
-            _size: 0,
-            _head: Self::CAPACITY,
-            _tail: Self::CAPACITY,
-        };
-        map._data.resize_with(Self::CAPACITY, Default::default);
-        map
+impl <K: Hash + std::cmp::Eq, V, const C: usize> Index<&K> for FixedSizeHashMap <K, V, C>
+where
+    Check<{is_prime_and_within_limit(C, 25013)}>: IsTrue,
+{
+    type Output = V;
+    fn index(&self, key: &K) -> &Self::Output {
+        self.get(key).expect("Panic! not in map")
     }
+}
 
-    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        let i = self.find_index(&key);
-        if i == Self::CAPACITY {
-            return None
-        }
-
-        let mut old_val: Option<V> = None;
-        match self._data[i].as_mut() {
-            Some(entry) => {
-                old_val = Some(mem::replace(&mut entry.value, value));
-                self.remove_from_list(i);
-                self.move_to_front_of_list(i);
-            }
-            None => {
-                let entry = Entry::new(key, value, Self::CAPACITY);
-                self._data[i] = Some(entry);
-                self.move_to_front_of_list(i);
-                self._size += 1;
-            }
-        }
-        old_val
-    }
-
-    pub fn exists(&self, key: &K) -> bool {
-        let i = self.find_index(key);
-        i != Self::CAPACITY && self._data[i].is_some()
-    }
-
-    pub fn get(&self, key: &K) -> Option<&V> {
-        let i = self.find_index(&key);
-        match self.get_at(i) {
-            Some(key_val_pair) => Some(key_val_pair.1),
-            None => None
-        }
-    }
-
-    pub fn remove(&mut self, key: &K) -> Option<V> {
-        let i = self.find_index(&key);
-        if i == Self::CAPACITY {
-            return None
-        }
-   
-        match self._data[i].as_mut() {
-            None => {},
-            Some(key_val) => {
-                self._size -= 1;
-                self.remove_from_list(i);
-            } 
-        }
-        
-        match mem::replace(&mut self._data[i], None) {
-            None => None,
-            Some(key_val) => Some(key_val.value)
-        }
-    } 
-
-    pub const fn capacity(&self) -> usize {
-        Self::CAPACITY
-    }
-    
-    pub fn size(&self) -> usize {
-        self._size
-    }
-
-    fn get_at(&self, i: usize) -> Option<(&K, &V)> {
-        if i == Self::CAPACITY {
-            return None
-        }
-        match self._data[i].as_ref() {
-            Some(data) => Some((&data.key, &data.value)),
-            None => None
-        }
-    }
-
-    pub fn head(&self) -> Option<(&K, &V)> {
-        self.get_at(self._head)
-    }
-
-    pub fn tail(&self) -> Option<(&K, &V)> {
-        self.get_at(self._tail)
+impl <K: Hash + std::cmp::Eq, V, const C: usize> IndexMut<&K> for FixedSizeHashMap <K, V, C>
+where
+    Check<{is_prime_and_within_limit(C, 25013)}>: IsTrue,
+{
+    fn index_mut(&mut self, key: &K) -> &mut Self::Output {
+        self.get_mut(key).expect("Panic! not in map")
     }
 }
 
@@ -297,5 +327,27 @@ mod tests {
         assert_eq!(old_val_of_zoo, None);
         assert_eq!(fmap.head(), Some( (&String::from("bat"), &400) ));
         assert_eq!(fmap.tail(), Some( (&String::from("foo"), &100) ));
+    }
+
+    #[test]
+    fn in_place_update() {
+        let mut fmap = MyMap::new();
+        add_some_data(&mut fmap, 4);
+        assert!(fmap.size() == 4);
+
+        fmap.get_mut(&String::from("bar")).and_then(|v| {*v += 1000; Some(true)});
+        assert_eq!(fmap.get(&String::from("bar")), Some(&1200));
+    }
+
+    #[test]
+    fn indexed_read_and_mutate() {
+        let mut fmap = MyMap::new();
+        add_some_data(&mut fmap, 4);
+        assert!(fmap.size() == 4);
+
+        assert_eq!(fmap[&String::from("bar")], 200);
+        fmap[&String::from("bar")] += 1000;
+
+        assert_eq!(fmap.get(&String::from("bar")), Some(&1200));
     }
 }
