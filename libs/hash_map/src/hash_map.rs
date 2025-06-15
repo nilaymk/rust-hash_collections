@@ -3,26 +3,26 @@ use std::hash::{DefaultHasher, Hash, Hasher};
 use std::mem;
 use std::ops::{Index, IndexMut};
 
-struct Entry <K, V> {
+struct Entry <K, V, const C: usize> {
     key: K,
     value: V,
     next: usize,
     prev: usize
 }
 
-impl <K, V> Entry <K, V> {
-    fn new(key: K, value: V, next_prev: usize) -> Entry<K, V> {
+impl <K, V, const C: usize> Entry <K, V, C> {
+    fn new(key: K, value: V) -> Entry<K, V, C> {
         Entry {
             key: key,
             value: value,
-            next: next_prev,
-            prev: next_prev,
+            next: C,
+            prev: C,
         }
     }
 }
 
 pub struct FixedSizeHashMap <K, V, const C: usize>  {
-    _data: Vec<Option<Entry<K, V>>>,
+    _data: Vec<Option<Entry<K, V, C>>>,
     _size: usize,
     _head: usize,
     _tail: usize
@@ -67,7 +67,7 @@ where
                 self._move_to_front_of_list(i);
             }
             None => {
-                let entry = Entry::new(key, value, Self::CAPACITY);
+                let entry: Entry<K, V, C> = Entry::new(key, value);
                 self._data[i] = Some(entry);
                 self._move_to_front_of_list(i);
                 self._size += 1;
@@ -83,7 +83,7 @@ where
 
     pub fn get(&self, key: &K) -> Option<&V> {
         let i = self._find_index(&key);
-        match self._get_at(i) {
+        match self._get_key_val_at(i) {
             Some(key_val_pair) => Some(key_val_pair.1),
             None => None
         }
@@ -131,14 +131,18 @@ where
     }
 
     pub fn head(&self) -> Option<(&K, &V)> {
-        self._get_at(self._head)
+        self._get_key_val_at(self._head)
     }
 
     pub fn tail(&self) -> Option<(&K, &V)> {
-        self._get_at(self._tail)
+        self._get_key_val_at(self._tail)
     }
 
-    fn _get_at(&self, i: usize) -> Option<(&K, &V)> {
+    pub fn iter(&self) -> MapIterator<K, V, C> {
+        MapIterator { _current: self._head, _data: &self._data }
+    }
+
+    fn _get_key_val_at(&self, i: usize) -> Option<(&K, &V)> {
         if i == Self::CAPACITY {
             return None
         }
@@ -209,6 +213,14 @@ where
             self._tail = entry_prev;
         }
     }
+
+    fn _get_entry_at(&self, i: usize) -> Option<&Entry<K, V, C>> {
+        if i == Self::CAPACITY {
+            return None
+        }
+        self._data[i].as_ref()
+    }
+
 }
 
 impl <K: Hash + std::cmp::Eq, V, const C: usize> Index<&K> for FixedSizeHashMap <K, V, C>
@@ -229,6 +241,39 @@ where
         self.get_mut(key).expect("Panic! not in map")
     }
 }
+
+pub struct MapIterator<'a, K: 'a, V: 'a, const C: usize>{
+    _current: usize,
+    _data: &'a Vec<Option<Entry<K, V, C>>>,
+}
+
+// impl <'a, K: 'a, V: 'a, const C: usize> Default for MapIterator<'a, K, V, C> {
+//     fn default() -> Self {
+//         MapIterator::<'a, K, V, C> {
+//             _current: C,
+//             _data: &'static [],
+//         }
+//     }
+// }
+
+
+impl <'a, K: 'a, V: 'a, const C: usize> Iterator for MapIterator<'a, K, V, C> {
+    type Item = (&'a K, &'a V);
+    fn next(&mut self) -> Option<Self::Item> {
+        if self._current >= C {
+            return None
+        }
+
+        match self._data[self._current].as_ref() {
+            Some(entry) => {
+                self._current = entry.next;
+                Some((&entry.key, &entry.value))
+            },
+            None => None
+        }
+    }
+}
+
 
 
 #[cfg(test)]
@@ -350,4 +395,22 @@ mod tests {
 
         assert_eq!(fmap.get(&String::from("bar")), Some(&1200));
     }
+
+    #[test]
+    fn forward_iteration() {
+        let mut fmap = MyMap::new();
+        add_some_data(&mut fmap, 4);
+        assert!(fmap.size() == 4);
+
+        let mut iter = fmap.iter();
+
+        assert_eq!(iter.next(), Some((&String::from("bat"), &400)) );
+        assert_eq!(iter.next(), Some((&String::from("baz"), &300)) );
+        assert_eq!(iter.next(), Some((&String::from("bar"), &200)) );
+        assert_eq!(iter.next(), Some((&String::from("foo"), &100)) );
+        assert_eq!(iter.next(), None ); 
+        assert_eq!(iter.next(), None ); 
+    }
+
+    
 }
