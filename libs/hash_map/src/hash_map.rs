@@ -138,8 +138,22 @@ where
         self._get_key_val_at(self._tail)
     }
 
-    pub fn iter(&self) -> MapIterator<K, V, C> {
-        MapIterator { _current: self._head, _data: &self._data }
+    pub fn iter_head(&self) -> MapIterator<'_, K, V, C, impl Fn(&Entry<K, V, C>) -> usize> {
+        MapIterator {
+            _remaining: self._size,
+            _current: self._head,
+            _data: &self._data,
+            _fn_next: |entry| {entry.next}
+         }
+    }
+
+    pub fn iter_tail(&self) -> MapIterator<'_, K, V, C, impl Fn(&Entry<K, V, C>) -> usize> {
+        MapIterator {
+            _remaining: self._size,
+            _current: self._tail,
+            _data: &self._data,
+            _fn_next: |entry| {entry.prev}
+         }
     }
 
     fn _get_key_val_at(&self, i: usize) -> Option<(&K, &V)> {
@@ -242,23 +256,20 @@ where
     }
 }
 
-pub struct MapIterator<'a, K: 'a, V: 'a, const C: usize>{
+pub struct MapIterator<'a, K: 'a, V: 'a, const C: usize, Next>
+where Next: Fn(&Entry<K, V, C>) -> usize
+{
+    _remaining: usize, 
     _current: usize,
     _data: &'a Vec<Option<Entry<K, V, C>>>,
+    _fn_next: Next,
 }
 
-// impl <'a, K: 'a, V: 'a, const C: usize> Default for MapIterator<'a, K, V, C> {
-//     fn default() -> Self {
-//         MapIterator::<'a, K, V, C> {
-//             _current: C,
-//             _data: &'static [],
-//         }
-//     }
-// }
-
-
-impl <'a, K: 'a, V: 'a, const C: usize> Iterator for MapIterator<'a, K, V, C> {
+impl <'a, K: 'a, V: 'a, const C: usize, Next> Iterator
+for MapIterator<'a, K, V, C, Next>
+where Next: Fn(&Entry<K, V, C>) -> usize  {
     type Item = (&'a K, &'a V);
+
     fn next(&mut self) -> Option<Self::Item> {
         if self._current >= C {
             return None
@@ -266,14 +277,22 @@ impl <'a, K: 'a, V: 'a, const C: usize> Iterator for MapIterator<'a, K, V, C> {
 
         match self._data[self._current].as_ref() {
             Some(entry) => {
-                self._current = entry.next;
+                self._remaining -= 1;
+                self._current = (self._fn_next)(&entry);
                 Some((&entry.key, &entry.value))
             },
             None => None
         }
     }
-}
 
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        (self._remaining, Some(self._remaining))
+    }
+
+    fn count(self) -> usize {
+        self._remaining
+    }
+}
 
 
 #[cfg(test)]
@@ -402,15 +421,39 @@ mod tests {
         add_some_data(&mut fmap, 4);
         assert!(fmap.size() == 4);
 
-        let mut iter = fmap.iter();
+        let mut iter = fmap.iter_head();
 
+        assert_eq!(iter.size_hint(), (4, Some(4)));
         assert_eq!(iter.next(), Some((&String::from("bat"), &400)) );
+        assert_eq!(iter.size_hint(), (3, Some(3)));
         assert_eq!(iter.next(), Some((&String::from("baz"), &300)) );
+        assert_eq!(iter.size_hint(), (2, Some(2)));
         assert_eq!(iter.next(), Some((&String::from("bar"), &200)) );
+        assert_eq!(iter.size_hint(), (1, Some(1)));
         assert_eq!(iter.next(), Some((&String::from("foo"), &100)) );
-        assert_eq!(iter.next(), None ); 
+        assert_eq!(iter.size_hint(), (0, Some(0)));
+        assert_eq!(iter.next(), None );
         assert_eq!(iter.next(), None ); 
     }
 
-    
+        #[test]
+    fn backward_iteration() {
+        let mut fmap = MyMap::new();
+        add_some_data(&mut fmap, 4);
+        assert!(fmap.size() == 4);
+
+        let mut iter = fmap.iter_tail();
+
+        assert_eq!(iter.size_hint(), (4, Some(4)));
+        assert_eq!(iter.next(), Some((&String::from("foo"), &100)) );
+        assert_eq!(iter.size_hint(), (3, Some(3)));
+        assert_eq!(iter.next(), Some((&String::from("bar"), &200)) );
+        assert_eq!(iter.size_hint(), (2, Some(2)));
+        assert_eq!(iter.next(), Some((&String::from("baz"), &300)) );
+        assert_eq!(iter.size_hint(), (1, Some(1)));
+        assert_eq!(iter.next(), Some((&String::from("bat"), &400)) );
+        assert_eq!(iter.size_hint(), (0, Some(0)));
+        assert_eq!(iter.next(), None );
+        assert_eq!(iter.next(), None ); 
+    }
 }
