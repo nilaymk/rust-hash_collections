@@ -7,7 +7,8 @@
 #![feature(core_intrinsics)]
 #![feature(inherent_associated_types)]
 
-
+mod tests;
+mod check;
 pub mod hash_map;
 
 pub use crate::hash_map::FixedSizeHashMap;
