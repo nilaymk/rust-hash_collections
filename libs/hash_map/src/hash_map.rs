@@ -24,6 +24,15 @@ pub const fn is_prime_and_within_limit(c: usize, max_cap: usize) -> bool {
     is_prime(c as u64) && c <= max_cap
 }
 
+impl <K: Hash + std::cmp::Eq, V, const C: usize> Default for FixedSizeHashMap <K, V, C>
+where
+    Check<{is_prime_and_within_limit(C, 25013)}>: IsTrue,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl <K: Hash + std::cmp::Eq, V, const C: usize> FixedSizeHashMap <K, V, C>
 where
     Check<{is_prime_and_within_limit(C, 25013)}>: IsTrue,
@@ -56,8 +65,8 @@ where
             }
             None => {
                 let entry: Entry<K, V, C> = Entry{
-                    key: key,
-                    value: value,
+                    key,
+                    value,
                     next: Self::CAPACITY,
                     prev: Self::CAPACITY,
                 };
@@ -75,7 +84,7 @@ where
     }
 
     pub fn get(&self, key: &K) -> Option<&V> {
-        let i = self._find_index(&key);
+        let i = self._find_index(key);
         match self._get_key_val_at(i) {
             Some(key_val_pair) => Some(key_val_pair.1),
             None => None
@@ -83,7 +92,7 @@ where
     }
 
     pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
-        let i = self._find_index(&key);
+        let i = self._find_index(key);
 
         if i == Self::CAPACITY {
             return None
@@ -96,7 +105,7 @@ where
     }
 
     pub fn remove(&mut self, key: &K) -> Option<V> {
-        let i = self._find_index(&key);
+        let i = self._find_index(key);
         if i == Self::CAPACITY {
             return None
         }
@@ -109,7 +118,7 @@ where
             } 
         }
         
-        match mem::replace(&mut self._data[i], None) {
+        match self._data[i].take() {
             None => None,
             Some(key_val) => Some(key_val.value)
         }
@@ -271,7 +280,7 @@ where Next: Fn(&Entry<K, V, C>) -> usize  {
         match self._data[self._current].as_ref() {
             Some(entry) => {
                 self._remaining -= 1;
-                self._current = (self._fn_next)(&entry);
+                self._current = (self._fn_next)(entry);
                 Some((&entry.key, &entry.value))
             },
             None => None
