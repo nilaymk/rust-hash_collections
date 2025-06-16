@@ -9,7 +9,7 @@ fn add_some_data(map: &mut MyMap, num: i32) {
         if i as i32 == num {
             break;
         }
-        map.insert(String::from(*key), (i as u64 +1)*100);
+        map.insert(String::from(*key), (i as u64 + 1) * 100);
     }
 }
 
@@ -27,16 +27,16 @@ fn insert_and_get_items() {
 
     assert!(fixed_size_map.capacity() == 13);
     assert_eq!(fixed_size_map.size(), 3);
-    assert!(fixed_size_map.exists(&String::from("foo"))
-        && fixed_size_map.exists(&String::from("bar"))
-        && fixed_size_map.exists(&String::from("baz"))
+    assert!(
+        fixed_size_map.exists(&String::from("foo"))
+            && fixed_size_map.exists(&String::from("bar"))
+            && fixed_size_map.exists(&String::from("baz"))
     );
     assert_eq!(fixed_size_map.get(&String::from("foo")), Some(&100));
     assert_eq!(fixed_size_map.get(&String::from("bar")), Some(&200));
     assert_eq!(fixed_size_map.get(&String::from("baz")), Some(&300));
-    assert_eq!(fixed_size_map.head(), Some( (&String::from("baz"), &300) ));
-    assert_eq!(fixed_size_map.tail(), Some( (&String::from("foo"), &100) ));
-
+    assert_eq!(fixed_size_map.head(), Some((&String::from("baz"), &300)));
+    assert_eq!(fixed_size_map.tail(), Some((&String::from("foo"), &100)));
 }
 #[test]
 fn update_items() {
@@ -45,7 +45,7 @@ fn update_items() {
     assert_eq!(fixed_size_map.size(), 4);
 
     let old_val = fixed_size_map.insert(String::from("bar"), 2000);
-    
+
     assert_eq!(fixed_size_map.size(), 4);
     assert!(fixed_size_map.get(&String::from("bar")) == Some(&2000));
     assert_eq!(old_val, Some(200));
@@ -65,8 +65,8 @@ fn remove_items_from_middle() {
     assert_eq!(old_val_of_baz, Some(300));
     assert_eq!(fixed_size_map.exists(&String::from("bar")), false);
     assert_eq!(fixed_size_map.exists(&String::from("zoo")), false);
-    assert_eq!(fixed_size_map.head(), Some( (&String::from("bat"), &400) ));
-    assert_eq!(fixed_size_map.tail(), Some( (&String::from("foo"), &100) ));
+    assert_eq!(fixed_size_map.head(), Some((&String::from("bat"), &400)));
+    assert_eq!(fixed_size_map.tail(), Some((&String::from("foo"), &100)));
 }
 
 #[test]
@@ -74,13 +74,13 @@ fn remove_head_and_tail_item() {
     let mut fixed_size_map = MyMap::new();
     add_some_data(&mut fixed_size_map, 4);
     assert!(fixed_size_map.size() == 4);
-    
+
     let _ = fixed_size_map.remove(&String::from("bat"));
     let _ = fixed_size_map.remove(&String::from("foo"));
 
     assert_eq!(fixed_size_map.size(), 2);
-    assert_eq!(fixed_size_map.head(), Some( (&String::from("baz"), &300) ));
-    assert_eq!(fixed_size_map.tail(), Some( (&String::from("bar"), &200) ));
+    assert_eq!(fixed_size_map.head(), Some((&String::from("baz"), &300)));
+    assert_eq!(fixed_size_map.tail(), Some((&String::from("bar"), &200)));
 }
 
 #[test]
@@ -93,8 +93,8 @@ fn remove_non_existent_item() {
 
     assert_eq!(fixed_size_map.size(), 4);
     assert_eq!(old_val_of_zoo, None);
-    assert_eq!(fixed_size_map.head(), Some( (&String::from("bat"), &400) ));
-    assert_eq!(fixed_size_map.tail(), Some( (&String::from("foo"), &100) ));
+    assert_eq!(fixed_size_map.head(), Some((&String::from("bat"), &400)));
+    assert_eq!(fixed_size_map.tail(), Some((&String::from("foo"), &100)));
 }
 
 #[test]
@@ -103,7 +103,10 @@ fn in_place_update() {
     add_some_data(&mut fixed_size_map, 4);
     assert!(fixed_size_map.size() == 4);
 
-    fixed_size_map.get_mut(&String::from("bar")).and_then(|v| {*v += 1000; Some(true)});
+    fixed_size_map.get_mut(&String::from("bar")).and_then(|v| {
+        *v += 1000;
+        Some(true)
+    });
     assert_eq!(fixed_size_map.get(&String::from("bar")), Some(&1200));
 }
 
@@ -128,19 +131,19 @@ fn forward_iteration() {
     let mut iter = fixed_size_map.iter_head();
 
     assert_eq!(iter.size_hint(), (4, Some(4)));
-    assert_eq!(iter.next(), Some((&String::from("bat"), &400)) );
+    assert_eq!(iter.next(), Some((&String::from("bat"), &400)));
     assert_eq!(iter.size_hint(), (3, Some(3)));
-    assert_eq!(iter.next(), Some((&String::from("baz"), &300)) );
+    assert_eq!(iter.next(), Some((&String::from("baz"), &300)));
     assert_eq!(iter.size_hint(), (2, Some(2)));
-    assert_eq!(iter.next(), Some((&String::from("bar"), &200)) );
+    assert_eq!(iter.next(), Some((&String::from("bar"), &200)));
     assert_eq!(iter.size_hint(), (1, Some(1)));
-    assert_eq!(iter.next(), Some((&String::from("foo"), &100)) );
+    assert_eq!(iter.next(), Some((&String::from("foo"), &100)));
     assert_eq!(iter.size_hint(), (0, Some(0)));
-    assert_eq!(iter.next(), None );
-    assert_eq!(iter.next(), None ); 
+    assert_eq!(iter.next(), None);
+    assert_eq!(iter.next(), None);
 }
 
-    #[test]
+#[test]
 fn backward_iteration() {
     let mut fixed_size_map = MyMap::new();
     add_some_data(&mut fixed_size_map, 4);
@@ -149,14 +152,14 @@ fn backward_iteration() {
     let mut iter = fixed_size_map.iter_tail();
 
     assert_eq!(iter.size_hint(), (4, Some(4)));
-    assert_eq!(iter.next(), Some((&String::from("foo"), &100)) );
+    assert_eq!(iter.next(), Some((&String::from("foo"), &100)));
     assert_eq!(iter.size_hint(), (3, Some(3)));
-    assert_eq!(iter.next(), Some((&String::from("bar"), &200)) );
+    assert_eq!(iter.next(), Some((&String::from("bar"), &200)));
     assert_eq!(iter.size_hint(), (2, Some(2)));
-    assert_eq!(iter.next(), Some((&String::from("baz"), &300)) );
+    assert_eq!(iter.next(), Some((&String::from("baz"), &300)));
     assert_eq!(iter.size_hint(), (1, Some(1)));
-    assert_eq!(iter.next(), Some((&String::from("bat"), &400)) );
+    assert_eq!(iter.next(), Some((&String::from("bat"), &400)));
     assert_eq!(iter.size_hint(), (0, Some(0)));
-    assert_eq!(iter.next(), None );
-    assert_eq!(iter.next(), None ); 
+    assert_eq!(iter.next(), None);
+    assert_eq!(iter.next(), None);
 }
