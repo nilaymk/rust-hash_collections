@@ -1,10 +1,24 @@
 use const_primes::is_prime;
+
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Index, IndexMut};
+use std::error;
+use std::fmt;
 
 use crate::check::{Check, IsTrue};
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct OutOfCapacityError {pub capacity: usize}
+
+impl fmt::Display for OutOfCapacityError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        write!(f, "HashMap has reached its capacity of {} entries", self.capacity)
+    }
+}
+
+impl error::Error for OutOfCapacityError {}
 
 pub struct Entry<K, V, const C: usize> {
     key: K,
@@ -93,10 +107,10 @@ where
         map
     }
 
-    pub fn insert(&mut self, key: K, value: V) -> Option<V> {
+    pub fn insert(&mut self, key: K, value: V) -> Result<Option<V>, OutOfCapacityError> {
         let i = self._find_index(&key, false);
         if i == Self::CAPACITY {
-            return None;
+            return Result::Err(OutOfCapacityError{capacity: Self::CAPACITY});
         }
 
         let mut old_val: Option<V> = None;
@@ -117,7 +131,7 @@ where
                 self._size += 1;
             }
         }
-        old_val
+        Result::Ok(old_val)
     }
 
     pub fn exists(&self, key: &K) -> bool {

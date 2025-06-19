@@ -49,7 +49,7 @@ fn update_items() {
 
     assert_eq!(fixed_size_map.size(), 4);
     assert!(fixed_size_map.get(&String::from("bar")) == Some(&2000));
-    assert_eq!(old_val, Some(200));
+    assert_eq!(old_val.unwrap(), Some(200));
 }
 
 #[test]
