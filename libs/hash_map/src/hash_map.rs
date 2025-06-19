@@ -138,14 +138,6 @@ where
     pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
         let i = self._find_index(key, true);
 
-        // if i == Self::CAPACITY {
-        //     return None;
-        // }
-
-        // match self._data[i] {
-        //     Slot::IsOccupiedBy(ref mut entry) => Some(&mut entry.value),
-        //     _ => None,
-        // }
         if i < Self::CAPACITY && let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
             Some(&mut entry.value)
         } else {
@@ -208,13 +200,6 @@ where
     }
 
     fn _get_key_val_at(&self, i: usize) -> Option<(&K, &V)> {
-        // if i == Self::CAPACITY {
-        //     return None;
-        // }
-        // match self._data[i] {
-        //     Slot::IsOccupiedBy(ref entry) => Some((&entry.key, &entry.value)),
-        //     _ => None,
-        // }
         if i < Self::CAPACITY && let Slot::IsOccupiedBy(ref entry) = self._data[i] {
             Some((&entry.key, &entry.value))
         } else {
@@ -247,17 +232,13 @@ where
             self._head = i;
             self._tail = i;
         } else {
-            match self._data[self._head] {
-                Slot::IsOccupiedBy(ref mut entry) => entry.prev = i,
-                _ => {}
+            if let Slot::IsOccupiedBy(ref mut entry) = self._data[self._head] {
+                entry.prev = i;
             }
         
-            match self._data[i] {
-                Slot::IsOccupiedBy(ref mut entry) => {
-                    entry.next = self._head;
-                    entry.prev = Self::CAPACITY;
-                }
-                _ => {},
+            if let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
+                entry.next = self._head;
+                entry.prev = Self::CAPACITY;
             }
 
             self._head = i;
@@ -296,14 +277,6 @@ where
     }
 
     fn _get_entry_at(&self, i: usize) -> Option<&Entry<K, V, C>> {
-        // if i >= Self::CAPACITY {
-        //     return None;
-        // }
-        // match self._data[i] {
-        //     Slot::IsOccupiedBy(ref entry) => Some(entry),
-        //     _ => None
-        // }
-
         if i < Self::CAPACITY && let Slot::IsOccupiedBy(ref entry) = self._data[i] {
             Some(entry)   
         } else {
@@ -352,17 +325,12 @@ where
     type Item = (&'a K, &'a V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self._current >= C {
-            return None;
-        }
-
-        match self._data[self._current] {
-            Slot::IsOccupiedBy(ref entry) => {
-                self._remaining -= 1;
-                self._current = (self._fn_next)(entry);
-                Some((&entry.key, &entry.value))
-            }
-            _ => None,
+        if self._current < C && let Slot::IsOccupiedBy(ref entry) = self._data[self._current] {
+            self._remaining -= 1;
+            self._current = (self._fn_next)(entry);
+            Some((&entry.key, &entry.value))
+        } else {
+            None
         }
     }
 
