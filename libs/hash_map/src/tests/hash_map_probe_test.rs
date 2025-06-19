@@ -1,5 +1,5 @@
 #![cfg(test)]
-use std::hash::{Hasher};
+use std::hash::Hasher;
 
 use crate::hash_map::FixedSizeHashMapImpl;
 
@@ -10,13 +10,12 @@ impl Hasher for HighCollisionHasher {
         3
     }
 
-    fn write(&mut self, _: &[u8]) {
-    }
+    fn write(&mut self, _: &[u8]) {}
 }
 
 impl Default for HighCollisionHasher {
-    fn default() -> Self { 
-        HighCollisionHasher{}
+    fn default() -> Self {
+        HighCollisionHasher {}
     }
 }
 
@@ -44,15 +43,29 @@ fn insert_and_get_colliding_items() {
             && high_collision_map.exists(&String::from("bar"))
             && high_collision_map.exists(&String::from("baz"))
     );
-    assert_eq!(high_collision_map.get(&String::from("foo")), Some(&"100".to_string()));
-    assert_eq!(high_collision_map.get(&String::from("bar")), Some(&"200".to_string()));
-    assert_eq!(high_collision_map.get(&String::from("baz")), Some(&"300".to_string()));
-    assert_eq!(high_collision_map.head(), Some((&String::from("baz"), &"300".to_string())));
-    assert_eq!(high_collision_map.tail(), Some((&String::from("foo"), &"100".to_string())));
+    assert_eq!(
+        high_collision_map.get(&String::from("foo")),
+        Some(&"100".to_string())
+    );
+    assert_eq!(
+        high_collision_map.get(&String::from("bar")),
+        Some(&"200".to_string())
+    );
+    assert_eq!(
+        high_collision_map.get(&String::from("baz")),
+        Some(&"300".to_string())
+    );
+    assert_eq!(
+        high_collision_map.head(),
+        Some((&String::from("baz"), &"300".to_string()))
+    );
+    assert_eq!(
+        high_collision_map.tail(),
+        Some((&String::from("foo"), &"100".to_string()))
+    );
 }
 
-
-#[test] 
+#[test]
 fn update_items() {
     let mut high_collision_map = MyHighCollisionMap::new();
     add_some_data(&mut high_collision_map, 4);
@@ -64,7 +77,6 @@ fn update_items() {
     assert!(high_collision_map.get(&String::from("bar")) == Some(&"2000".to_string()));
     assert_eq!(old_val, Some("200".to_string()));
 }
-
 
 #[test]
 fn remove_items_from_middle() {

@@ -1,8 +1,8 @@
 use const_primes::is_prime;
 use std::hash::{DefaultHasher, Hash, Hasher};
+use std::marker::PhantomData;
 use std::mem;
 use std::ops::{Index, IndexMut};
-use std::marker::PhantomData;
 
 use crate::check::{Check, IsTrue};
 
@@ -19,17 +19,17 @@ pub enum Slot<T> {
     IsOccupiedBy(T),
 }
 
-impl <T> Default for Slot<T> {
+impl<T> Default for Slot<T> {
     fn default() -> Self {
         Self::Empty
     }
 }
 
-impl <T> Slot<T> {
+impl<T> Slot<T> {
     fn is_occupied(&self) -> bool {
         match self {
             Self::IsOccupiedBy(_) => true,
-            _ => false
+            _ => false,
         }
     }
 
@@ -38,18 +38,17 @@ impl <T> Slot<T> {
         (*self, old_entry) = match std::mem::replace(self, Slot::Empty) {
             Slot::IsOccupiedBy(old_entry) => (Slot::WasOccupied, Some(old_entry)),
             Slot::WasOccupied => (Slot::WasOccupied, None),
-            Slot::Empty => (Slot::Empty, None)
+            Slot::Empty => (Slot::Empty, None),
         };
         old_entry
     }
-
 }
 
 pub struct FixedSizeHashMapImpl<K, V, const C: usize, H>
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
     K: Hash + std::cmp::Eq,
-    H: Default + Hasher 
+    H: Default + Hasher,
 {
     _data: Vec<Slot<Entry<K, V, C>>>,
     _size: usize,
@@ -66,7 +65,7 @@ impl<K, V, const C: usize, H> Default for FixedSizeHashMapImpl<K, V, C, H>
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
     K: Hash + std::cmp::Eq,
-    H: Default + Hasher
+    H: Default + Hasher,
 {
     fn default() -> Self {
         Self::new()
@@ -77,7 +76,7 @@ impl<K, V, const C: usize, H> FixedSizeHashMapImpl<K, V, C, H>
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
     K: Hash + std::cmp::Eq,
-    H: Default + Hasher
+    H: Default + Hasher,
 {
     const CAPACITY: usize = C;
     type _Hash = H;
@@ -101,7 +100,7 @@ where
         }
 
         let mut old_val: Option<V> = None;
-        match self._data[i]  {
+        match self._data[i] {
             Slot::IsOccupiedBy(ref mut entry) => {
                 old_val = Some(mem::replace(&mut entry.value, value));
                 self._remove_from_list(i);
@@ -109,12 +108,11 @@ where
             }
             Slot::Empty | Slot::WasOccupied => {
                 self._data[i] = Slot::IsOccupiedBy(Entry {
-                        key,
-                        value,
-                        next: Self::CAPACITY,
-                        prev: Self::CAPACITY,
-                    }
-                );
+                    key,
+                    value,
+                    next: Self::CAPACITY,
+                    prev: Self::CAPACITY,
+                });
                 self._move_to_front_of_list(i);
                 self._size += 1;
             }
@@ -138,7 +136,9 @@ where
     pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
         let i = self._find_index(key, true);
 
-        if i < Self::CAPACITY && let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
+        if i < Self::CAPACITY
+            && let Slot::IsOccupiedBy(ref mut entry) = self._data[i]
+        {
             Some(&mut entry.value)
         } else {
             None
@@ -155,7 +155,7 @@ where
             Slot::IsOccupiedBy(_) => {
                 self._size -= 1;
                 self._remove_from_list(i);
-            },
+            }
             _ => {}
         }
 
@@ -200,7 +200,9 @@ where
     }
 
     fn _get_key_val_at(&self, i: usize) -> Option<(&K, &V)> {
-        if i < Self::CAPACITY && let Slot::IsOccupiedBy(ref entry) = self._data[i] {
+        if i < Self::CAPACITY
+            && let Slot::IsOccupiedBy(ref entry) = self._data[i]
+        {
             Some((&entry.key, &entry.value))
         } else {
             None
@@ -213,11 +215,10 @@ where
         let already_visited = (hash_state.finish() % Self::CAPACITY as u64) as usize;
         let mut index = already_visited;
         while match self._data[index] {
-                Slot::IsOccupiedBy(ref entry) => entry.key != *key,
-                Slot::WasOccupied => skip_previously_occupied,
-                Slot::Empty => false
-            }
-        {
+            Slot::IsOccupiedBy(ref entry) => entry.key != *key,
+            Slot::WasOccupied => skip_previously_occupied,
+            Slot::Empty => false,
+        } {
             index = (index + 1) % Self::CAPACITY; // linear probing
             if index == already_visited {
                 return Self::CAPACITY;
@@ -235,7 +236,7 @@ where
             if let Slot::IsOccupiedBy(ref mut entry) = self._data[self._head] {
                 entry.prev = i;
             }
-        
+
             if let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
                 entry.next = self._head;
                 entry.prev = Self::CAPACITY;
@@ -277,8 +278,10 @@ where
     }
 
     fn _get_entry_at(&self, i: usize) -> Option<&Entry<K, V, C>> {
-        if i < Self::CAPACITY && let Slot::IsOccupiedBy(ref entry) = self._data[i] {
-            Some(entry)   
+        if i < Self::CAPACITY
+            && let Slot::IsOccupiedBy(ref entry) = self._data[i]
+        {
+            Some(entry)
         } else {
             None
         }
@@ -289,7 +292,7 @@ impl<'a, K: 'a, V: 'a, const C: usize, H> Index<&K> for FixedSizeHashMapImpl<K, 
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
     K: Hash + std::cmp::Eq,
-    H: Default + Hasher
+    H: Default + Hasher,
 {
     type Output = V;
     fn index(&self, key: &K) -> &Self::Output {
@@ -301,7 +304,7 @@ impl<K, V, const C: usize, H> IndexMut<&K> for FixedSizeHashMapImpl<K, V, C, H>
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
     K: Hash + std::cmp::Eq,
-    H: Default + Hasher
+    H: Default + Hasher,
 {
     fn index_mut(&mut self, key: &K) -> &mut Self::Output {
         self.get_mut(key).expect("Panic! not in map")
@@ -325,7 +328,9 @@ where
     type Item = (&'a K, &'a V);
 
     fn next(&mut self) -> Option<Self::Item> {
-        if self._current < C && let Slot::IsOccupiedBy(ref entry) = self._data[self._current] {
+        if self._current < C
+            && let Slot::IsOccupiedBy(ref entry) = self._data[self._current]
+        {
             self._remaining -= 1;
             self._current = (self._fn_next)(entry);
             Some((&entry.key, &entry.value))
@@ -342,6 +347,5 @@ where
         self._remaining
     }
 }
-
 
 pub type FixedSizeHashMap<K, V, const C: usize> = FixedSizeHashMapImpl<K, V, C, DefaultHasher>;
