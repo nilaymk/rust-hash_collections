@@ -2,6 +2,7 @@ use const_primes::is_prime;
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::mem;
 use std::ops::{Index, IndexMut};
+use std::marker::PhantomData;
 
 use crate::check::{Check, IsTrue};
 
@@ -12,38 +13,50 @@ pub struct Entry<K, V, const C: usize> {
     prev: usize,
 }
 
-pub struct FixedSizeHashMap<K, V, const C: usize> {
+pub struct FixedSizeHashMapImpl<K, V, const C: usize, H>
+where
+    Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
+    K: Hash + std::cmp::Eq,
+    H: Default + Hasher 
+{
     _data: Vec<Option<Entry<K, V, C>>>,
     _size: usize,
     _head: usize,
     _tail: usize,
+    _phantom: PhantomData<H>,
 }
 
 pub const fn is_prime_and_within_limit(c: usize, max_cap: usize) -> bool {
     is_prime(c as u64) && c <= max_cap
 }
 
-impl<K: Hash + std::cmp::Eq, V, const C: usize> Default for FixedSizeHashMap<K, V, C>
+impl<K, V, const C: usize, H> Default for FixedSizeHashMapImpl<K, V, C, H>
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
+    K: Hash + std::cmp::Eq,
+    H: Default + Hasher
 {
     fn default() -> Self {
         Self::new()
     }
 }
 
-impl<K: Hash + std::cmp::Eq, V, const C: usize> FixedSizeHashMap<K, V, C>
+impl<K, V, const C: usize, H> FixedSizeHashMapImpl<K, V, C, H>
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
+    K: Hash + std::cmp::Eq,
+    H: Default + Hasher
 {
     const CAPACITY: usize = C;
+    type _Hash = H;
 
-    pub fn new() -> FixedSizeHashMap<K, V, C> {
-        let mut map = FixedSizeHashMap {
+    pub fn new() -> FixedSizeHashMapImpl<K, V, C, H> {
+        let mut map = FixedSizeHashMapImpl::<K, V, C, H> {
             _data: Vec::new(),
             _size: 0,
             _head: Self::CAPACITY,
             _tail: Self::CAPACITY,
+            _phantom: Default::default(),
         };
         map._data.resize_with(Self::CAPACITY, Default::default);
         map
@@ -168,9 +181,9 @@ where
     }
 
     fn _find_index(&self, key: &K) -> usize {
-        let mut s = DefaultHasher::new();
-        key.hash(&mut s);
-        let already_visited = (s.finish() % Self::CAPACITY as u64) as usize;
+        let mut hash_state: Self::_Hash = Default::default();
+        key.hash(&mut hash_state);
+        let already_visited = (hash_state.finish() % Self::CAPACITY as u64) as usize;
         let mut index = already_visited;
         while self._data[index]
             .as_ref()
@@ -249,9 +262,11 @@ where
     }
 }
 
-impl<K: Hash + std::cmp::Eq, V, const C: usize> Index<&K> for FixedSizeHashMap<K, V, C>
+impl<K, V, const C: usize, H> Index<&K> for FixedSizeHashMapImpl<K, V, C, H>
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
+    K: Hash + std::cmp::Eq,
+    H: Default + Hasher
 {
     type Output = V;
     fn index(&self, key: &K) -> &Self::Output {
@@ -259,9 +274,11 @@ where
     }
 }
 
-impl<K: Hash + std::cmp::Eq, V, const C: usize> IndexMut<&K> for FixedSizeHashMap<K, V, C>
+impl<K, V, const C: usize, H> IndexMut<&K> for FixedSizeHashMapImpl<K, V, C, H>
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
+    K: Hash + std::cmp::Eq,
+    H: Default + Hasher
 {
     fn index_mut(&mut self, key: &K) -> &mut Self::Output {
         self.get_mut(key).expect("Panic! not in map")
@@ -307,3 +324,6 @@ where
         self._remaining
     }
 }
+
+
+pub type FixedSizeHashMap<K, V, const C: usize> = FixedSizeHashMapImpl<K, V, C, DefaultHasher>;

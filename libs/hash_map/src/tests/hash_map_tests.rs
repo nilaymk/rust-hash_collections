@@ -3,6 +3,7 @@
 use crate::FixedSizeHashMap;
 
 type MyMap = FixedSizeHashMap<String, u64, 13>;
+
 fn add_some_data(map: &mut MyMap, num: i32) {
     let keys = ["foo", "bar", "baz", "bat", "boo", "fat"];
     for (i, key) in keys.iter().enumerate() {
