@@ -13,13 +13,45 @@ pub struct Entry<K, V, const C: usize> {
     prev: usize,
 }
 
+pub enum Slot<T> {
+    Empty,
+    WasOccupied,
+    IsOccupiedBy(T),
+}
+
+impl <T> Default for Slot<T> {
+    fn default() -> Self {
+        Self::Empty
+    }
+}
+
+impl <T> Slot<T> {
+    fn is_occupied(&self) -> bool {
+        match self {
+            Self::IsOccupiedBy(_) => true,
+            _ => false
+        }
+    }
+
+    fn take(&mut self) -> Option<T> {
+        let old_entry;
+        (*self, old_entry) = match std::mem::replace(self, Slot::Empty) {
+            Slot::IsOccupiedBy(old_entry) => (Slot::WasOccupied, Some(old_entry)),
+            Slot::WasOccupied => (Slot::WasOccupied, None),
+            Slot::Empty => (Slot::Empty, None)
+        };
+        old_entry
+    }
+
+}
+
 pub struct FixedSizeHashMapImpl<K, V, const C: usize, H>
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher 
 {
-    _data: Vec<Option<Entry<K, V, C>>>,
+    _data: Vec<Slot<Entry<K, V, C>>>,
     _size: usize,
     _head: usize,
     _tail: usize,
@@ -63,26 +95,26 @@ where
     }
 
     pub fn insert(&mut self, key: K, value: V) -> Option<V> {
-        let i = self._find_index(&key);
+        let i = self._find_index(&key, false);
         if i == Self::CAPACITY {
             return None;
         }
 
         let mut old_val: Option<V> = None;
-        match self._data[i].as_mut() {
-            Some(entry) => {
+        match self._data[i]  {
+            Slot::IsOccupiedBy(ref mut entry) => {
                 old_val = Some(mem::replace(&mut entry.value, value));
                 self._remove_from_list(i);
                 self._move_to_front_of_list(i);
             }
-            None => {
-                let entry: Entry<K, V, C> = Entry {
-                    key,
-                    value,
-                    next: Self::CAPACITY,
-                    prev: Self::CAPACITY,
-                };
-                self._data[i] = Some(entry);
+            Slot::Empty | Slot::WasOccupied => {
+                self._data[i] = Slot::IsOccupiedBy(Entry {
+                        key,
+                        value,
+                        next: Self::CAPACITY,
+                        prev: Self::CAPACITY,
+                    }
+                );
                 self._move_to_front_of_list(i);
                 self._size += 1;
             }
@@ -91,12 +123,12 @@ where
     }
 
     pub fn exists(&self, key: &K) -> bool {
-        let i = self._find_index(key);
-        i != Self::CAPACITY && self._data[i].is_some()
+        let i = self._find_index(key, true);
+        i != Self::CAPACITY && self._data[i].is_occupied()
     }
 
     pub fn get(&self, key: &K) -> Option<&V> {
-        let i = self._find_index(key);
+        let i = self._find_index(key, true);
         match self._get_key_val_at(i) {
             Some(key_val_pair) => Some(key_val_pair.1),
             None => None,
@@ -104,35 +136,40 @@ where
     }
 
     pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
-        let i = self._find_index(key);
+        let i = self._find_index(key, true);
 
-        if i == Self::CAPACITY {
-            return None;
-        }
+        // if i == Self::CAPACITY {
+        //     return None;
+        // }
 
-        match self._data[i].as_mut() {
-            Some(data) => Some(&mut data.value),
-            None => None,
+        // match self._data[i] {
+        //     Slot::IsOccupiedBy(ref mut entry) => Some(&mut entry.value),
+        //     _ => None,
+        // }
+        if i < Self::CAPACITY && let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
+            Some(&mut entry.value)
+        } else {
+            None
         }
     }
 
     pub fn remove(&mut self, key: &K) -> Option<V> {
-        let i = self._find_index(key);
+        let i = self._find_index(key, true);
         if i == Self::CAPACITY {
             return None;
         }
 
-        match self._data[i].as_mut() {
-            None => {}
-            Some(_) => {
+        match self._data[i] {
+            Slot::IsOccupiedBy(_) => {
                 self._size -= 1;
                 self._remove_from_list(i);
-            }
+            },
+            _ => {}
         }
 
         match self._data[i].take() {
+            Some(entry) => Some(entry.value),
             None => None,
-            Some(key_val) => Some(key_val.value),
         }
     }
 
@@ -171,23 +208,30 @@ where
     }
 
     fn _get_key_val_at(&self, i: usize) -> Option<(&K, &V)> {
-        if i == Self::CAPACITY {
-            return None;
-        }
-        match self._data[i].as_ref() {
-            Some(data) => Some((&data.key, &data.value)),
-            None => None,
+        // if i == Self::CAPACITY {
+        //     return None;
+        // }
+        // match self._data[i] {
+        //     Slot::IsOccupiedBy(ref entry) => Some((&entry.key, &entry.value)),
+        //     _ => None,
+        // }
+        if i < Self::CAPACITY && let Slot::IsOccupiedBy(ref entry) = self._data[i] {
+            Some((&entry.key, &entry.value))
+        } else {
+            None
         }
     }
 
-    fn _find_index(&self, key: &K) -> usize {
+    fn _find_index(&self, key: &K, skip_previously_occupied: bool) -> usize {
         let mut hash_state: Self::_Hash = Default::default();
         key.hash(&mut hash_state);
         let already_visited = (hash_state.finish() % Self::CAPACITY as u64) as usize;
         let mut index = already_visited;
-        while self._data[index]
-            .as_ref()
-            .is_some_and(|key_val| key_val.key != *key)
+        while match self._data[index] {
+                Slot::IsOccupiedBy(ref entry) => entry.key != *key,
+                Slot::WasOccupied => skip_previously_occupied,
+                Slot::Empty => false
+            }
         {
             index = (index + 1) % Self::CAPACITY; // linear probing
             if index == already_visited {
@@ -203,15 +247,17 @@ where
             self._head = i;
             self._tail = i;
         } else {
-            unsafe {
-                self._data
-                    .get_unchecked_mut(self._head)
-                    .as_mut()
-                    .unwrap()
-                    .prev = i;
-                let entry = self._data.get_unchecked_mut(i).as_mut().unwrap();
-                entry.next = self._head;
-                entry.prev = Self::CAPACITY;
+            match self._data[self._head] {
+                Slot::IsOccupiedBy(ref mut entry) => entry.prev = i,
+                _ => {}
+            }
+        
+            match self._data[i] {
+                Slot::IsOccupiedBy(ref mut entry) => {
+                    entry.next = self._head;
+                    entry.prev = Self::CAPACITY;
+                }
+                _ => {},
             }
 
             self._head = i;
@@ -219,35 +265,30 @@ where
     }
 
     fn _remove_from_list(&mut self, i: usize) {
-        let entry_next: usize;
-        let entry_prev: usize;
-        unsafe {
-            let entry = self._data.get_unchecked(i).as_ref().unwrap();
-            entry_next = entry.next;
-            entry_prev = entry.prev;
+        let mut entry_next = Self::CAPACITY;
+        let mut entry_prev = Self::CAPACITY;
+
+        match self._data[i] {
+            Slot::IsOccupiedBy(ref entry) => {
+                entry_next = entry.next;
+                entry_prev = entry.prev;
+            }
+            _ => {}
         }
 
         if entry_prev != Self::CAPACITY {
-            unsafe {
-                self._data
-                    .get_unchecked_mut(entry_prev)
-                    .as_mut()
-                    .unwrap()
-                    .next = entry_next;
+            match self._data[entry_prev] {
+                Slot::IsOccupiedBy(ref mut entry) => entry.next = entry_next,
+                _ => {}
             }
         } else {
             self._head = entry_next;
         }
+
         if entry_next != Self::CAPACITY {
-            unsafe {
-                let _ = self
-                    ._data
-                    .get_unchecked_mut(entry_next)
-                    .as_mut()
-                    .is_some_and(|next_entry| {
-                        next_entry.prev = entry_prev;
-                        true
-                    });
+            match self._data[entry_next] {
+                Slot::IsOccupiedBy(ref mut entry) => entry.prev = entry_prev,
+                _ => {}
             }
         } else {
             self._tail = entry_prev;
@@ -255,14 +296,23 @@ where
     }
 
     fn _get_entry_at(&self, i: usize) -> Option<&Entry<K, V, C>> {
-        if i == Self::CAPACITY {
-            return None;
+        // if i >= Self::CAPACITY {
+        //     return None;
+        // }
+        // match self._data[i] {
+        //     Slot::IsOccupiedBy(ref entry) => Some(entry),
+        //     _ => None
+        // }
+
+        if i < Self::CAPACITY && let Slot::IsOccupiedBy(ref entry) = self._data[i] {
+            Some(entry)   
+        } else {
+            None
         }
-        self._data[i].as_ref()
     }
 }
 
-impl<K, V, const C: usize, H> Index<&K> for FixedSizeHashMapImpl<K, V, C, H>
+impl<'a, K: 'a, V: 'a, const C: usize, H> Index<&K> for FixedSizeHashMapImpl<K, V, C, H>
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
     K: Hash + std::cmp::Eq,
@@ -291,7 +341,7 @@ where
 {
     _remaining: usize,
     _current: usize,
-    _data: &'a Vec<Option<Entry<K, V, C>>>,
+    _data: &'a Vec<Slot<Entry<K, V, C>>>,
     _fn_next: Next,
 }
 
@@ -306,13 +356,13 @@ where
             return None;
         }
 
-        match self._data[self._current].as_ref() {
-            Some(entry) => {
+        match self._data[self._current] {
+            Slot::IsOccupiedBy(ref entry) => {
                 self._remaining -= 1;
                 self._current = (self._fn_next)(entry);
                 Some((&entry.key, &entry.value))
             }
-            None => None,
+            _ => None,
         }
     }
 
