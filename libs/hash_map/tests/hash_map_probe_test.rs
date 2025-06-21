@@ -1,7 +1,7 @@
 #![cfg(test)]
 use std::hash::Hasher;
 
-use crate::hash_map::{FixedSizeHashMapImpl, OutOfCapacityError};
+use hash_map::hash_map::{FixedSizeHashMapImpl, OutOfCapacityError};
 
 struct HighCollisionHasher {}
 
@@ -27,7 +27,7 @@ fn add_some_data(map: &mut MyHighCollisionMap, num: i32) {
         if i as i32 == num {
             break;
         }
-        map.insert(String::from(*key), ((i as u64 + 1) * 100).to_string());
+        let _ = map.insert(String::from(*key), ((i as u64 + 1) * 100).to_string());
     }
 }
 
@@ -107,3 +107,5 @@ fn out_of_capacity_error() {
 
     assert_eq!(res.unwrap_err(), OutOfCapacityError{capacity: 7})
 }
+
+

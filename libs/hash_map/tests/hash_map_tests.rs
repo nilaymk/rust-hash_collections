@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use crate::FixedSizeHashMap;
+use hash_map::FixedSizeHashMap;
 
 type MyMap = FixedSizeHashMap<String, u64, 13>;
 
@@ -10,7 +10,7 @@ fn add_some_data(map: &mut MyMap, num: i32) {
         if i as i32 == num {
             break;
         }
-        map.insert(String::from(*key), (i as u64 + 1) * 100);
+        let _ = map.insert(String::from(*key), (i as u64 + 1) * 100);
     }
 }
 

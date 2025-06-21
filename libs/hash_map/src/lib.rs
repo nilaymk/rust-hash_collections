@@ -8,6 +8,6 @@
 
 mod check;
 pub mod hash_map;
-mod tests;
+// mod tests;
 
 pub use crate::hash_map::FixedSizeHashMap;
