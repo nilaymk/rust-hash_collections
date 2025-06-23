@@ -1,7 +1,7 @@
 #![cfg(test)]
 use std::hash::Hasher;
 
-use hash_map::hash_map::{FixedSizeHashMapImpl, OutOfCapacityError};
+use hash_collections::hash_map::{FixedSizeHashMapImpl, OutOfCapacityError};
 
 struct HighCollisionHasher {}
 

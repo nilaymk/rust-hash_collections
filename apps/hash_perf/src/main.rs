@@ -1,4 +1,4 @@
-type MyMap = hash_map::FixedSizeHashMap<String, String, 97>;
+type MyMap = hash_collections::FixedSizeHashMap<String, String, 97>;
 
 fn main() {
     let mut fmap: MyMap = MyMap::new();

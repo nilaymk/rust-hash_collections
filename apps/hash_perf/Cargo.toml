@@ -4,4 +4,4 @@ version = "0.1.0"
 edition = "2024"
 
 [dependencies]
-hash_map = {"path" = "../../libs/hash_map"}
+hash_collections = {"path" = "../../libs/hash_collections"}

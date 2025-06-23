@@ -1,5 +1,5 @@
 [package]
-name = "hash_map"
+name = "hash_collections"
 version = "0.1.0"
 edition = "2024"
 
