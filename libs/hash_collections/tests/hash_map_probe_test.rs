@@ -105,7 +105,5 @@ fn out_of_capacity_error() {
 
     let res = high_collision_map.insert("uhuh".to_string(), "wtf".to_string());
 
-    assert_eq!(res.unwrap_err(), OutOfCapacityError{capacity: 7})
+    assert_eq!(res.unwrap_err(), OutOfCapacityError { capacity: 7 })
 }
-
-

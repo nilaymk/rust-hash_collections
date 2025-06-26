@@ -8,5 +8,7 @@
 
 mod check;
 pub mod hash_map;
+pub mod hash_graph;
 
 pub use crate::hash_map::FixedSizeHashMap;
+pub use crate::hash_map::FixedSizeHashSet;
