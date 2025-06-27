@@ -4,15 +4,14 @@ use std::mem;
 
 use crate::check::{Check, IsTrue, is_prime_and_within_limit};
 
-struct Edge {
-    _to: usize,
-    _weight: usize,
-}
+
+type Edges = FixedSizeHashMap<usize, u32, 151>;
+type FromNodes = FixedSizeHashSet<usize, 151>;
 
 struct Node<V> {
     _value: V,
-    _connected_to: FixedSizeHashMap<usize, u32, 151>,
-    _connected_from: FixedSizeHashSet<usize, 151>,
+    _connected_to: Edges,
+    _connected_from: FromNodes
 }
 
 struct FixedSizeHashGraphImpl<K, V, const C: usize, H>
@@ -97,57 +96,60 @@ where
     }
 
     fn remove(&mut self, key: &K) {
-        let (index, to_indexes, from_indexes): (usize, Vec<usize>, Vec<usize>) =
+        let (index, edges, from_nodes): (usize, Edges, FromNodes) =
             match self._hash_map._get_mut_value_and_index_of(key) {
                 Some((node, index)) => {
                     (
                         index,
-                        node._connected_to.iter_head().map(|kv| *kv.0).collect(),
-                        node._connected_from.iter_head().map(|kv| *kv.0).collect()
+                        mem::take(&mut node._connected_to),
+                        mem::take(&mut node._connected_from)
                     )
                 },
                 None => return,
             };
         
-        for to_index in to_indexes {
-            let Some(to_node) = self._hash_map._get_mut_value_at(to_index) else {
-                continue;
-            };
-            to_node._connected_from.remove(&index);
+        for (edge_index, _) in edges.iter_head() {
+            if let Some(to_node) = self._hash_map._get_mut_value_at(*edge_index) {
+                to_node._connected_from.remove(&index);
+            }
         }
 
-        for from_index in from_indexes {
-            let Some(from_node) = self._hash_map._get_mut_value_at(from_index) else {
-                continue;
+        for (from_index, _) in from_nodes.iter_head() {
+            if let Some(from_node) = self._hash_map._get_mut_value_at(*from_index) {
+                from_node._connected_to.remove(&index);
             };
-            from_node._connected_to.remove(&index);
         }
 
         self._hash_map.remove(&key);
     }
 
-    // fn disconnect_from(&mut self, key: &K, to_keys: Vec<&K>) {
-    //     let Some((node, index)) = self._hash_map._get_mut_and_index(key) else {
-    //         return
-    //     };
+    fn disconnect_from(&mut self, key: &K, to_keys: Vec<&K>) {
+        let Some(index) = self._hash_map._get_index_of(key) else {return};
         
-    //     for to_key in to_keys {
-    //         let Some((to_node, to_index)) = self._hash_map._get_mut_and_index(to_key) else {
-    //             continue;
-    //         };
+        for to_key in to_keys {
+            if let Some((to_node, to_index)) = self._hash_map._get_mut_value_and_index_of(to_key) {
+                to_node._connected_from.remove(&index);
 
-    //         let Some(weight) = node._to._get_mut_at(to_index) else {
-    //             continue;
-    //         };
+                if let Some(node) = self._hash_map._get_mut_value_at(index){
+                    if let Some(edge_weight) = node._connected_to.get_mut(&to_index) {
+                        if *edge_weight == 1 {
+                            node._connected_to.remove(&to_index);
+                        } else {
+                            *edge_weight-=1;
+                        }
+                    }
+                }
+            }
+        }
+    }
 
-    //         *weight-=1;
-    //         if *weight == 0 {
-    //             to_node._from.remove(&index);
-    //         }
-    //     }
-    // }
-
-    // fn disconnect_all() {
-
-    // }
+    fn disconnect_all(&mut self, key: &K) {
+        let Some((node, index)) = self._hash_map._get_mut_value_and_index_of(key) else {return};
+        
+        for (to_index, _) in mem::take(&mut node._connected_to).iter_head() {
+            if let Some(to_node) = self._hash_map._get_mut_value_at(*to_index) {
+                to_node._connected_from.remove(&index);
+            }
+        }
+    }
 }

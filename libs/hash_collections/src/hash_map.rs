@@ -70,7 +70,6 @@ where
 }
 
 
-
 impl<K, V, const C: usize, H> Default for FixedSizeHashMapImpl<K, V, C, H>
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
@@ -82,25 +81,45 @@ where
     }
 }
 
+
+// hash_map Internals 
 impl<K, V, const C: usize, H> FixedSizeHashMapImpl<K, V, C, H>
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
 {
-    const CAPACITY: usize = C;
-    type _Hash = H;
+    pub(crate) fn _get_index_of(&mut self, key: &K) -> Option<usize> {
+        let i = self._find_index(key, true);
+        if i != Self::CAPACITY && self._data[i].is_occupied() {Some(i)} else {None}
+    }
 
-    pub fn new() -> FixedSizeHashMapImpl<K, V, C, H> {
-        let mut map = FixedSizeHashMapImpl::<K, V, C, H> {
-            _data: Vec::new(),
-            _size: 0,
-            _head: Self::CAPACITY,
-            _tail: Self::CAPACITY,
-            _phantom: Default::default(),
-        };
-        map._data.resize_with(Self::CAPACITY, Default::default);
-        map
+    pub(crate) fn _get_mut_value_and_index_of(&mut self, key: &K) -> Option<(&mut V, usize)> {
+        let i = self._find_index(key, true);
+        if i != Self::CAPACITY && let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
+            Some ((&mut entry.value, i))
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn _get_val_and_index_of(&self, key: &K) -> Option<(&V, usize)> {
+        let i = self._find_index(key, true);
+        if i != Self::CAPACITY && let Slot::IsOccupiedBy(ref entry) = self._data[i] {
+            Some ((&entry.value, i))
+        } else {
+            None
+        }
+    }
+
+    pub(crate) fn _get_mut_value_at(&mut self, i: usize) -> Option<&mut V> {
+        if i < Self::CAPACITY
+            && let Slot::IsOccupiedBy(ref mut entry) = self._data[i]
+        {
+            Some(&mut entry.value)
+        } else {
+            None
+        }
     }
 
     pub(crate) fn _insert_get_index(&mut self, key: K, value: V) -> Result<(usize, Option<V>), OutOfCapacityError> {
@@ -129,124 +148,6 @@ where
         }
 
         Result::Ok((i, old_val))
-    }
-
-    pub fn insert(&mut self, key: K, value: V) -> Result<Option<V>, OutOfCapacityError> {
-        let result = self._insert_get_index(key, value);
-        result.map(|rv| rv.1)
-    }
-
-    pub fn insert_or<F: FnOnce(&mut V)>(&mut self, key: K, value: V, op: F) -> Result<(), OutOfCapacityError> {
-        if let Some(value) = self.get_mut(&key) {
-            op(value);
-            Ok(())
-        } else {
-            self.insert(key, value).map(|_| ())
-        }
-    }
-
-    pub fn exists(&self, key: &K) -> bool {
-        let i = self._find_index(key, true);
-        i != Self::CAPACITY && self._data[i].is_occupied() 
-    }
-
-    pub fn get(&self, key: &K) -> Option<&V> {
-        let i = self._find_index(key, true);
-
-        if i != Self::CAPACITY && let Slot::IsOccupiedBy(ref entry) = self._data[i]
-        {
-            Some(&entry.value)
-        } else {
-            None
-        }
-    }
-
-    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
-        let i = self._find_index(key, true);
-
-        if i < Self::CAPACITY && let Slot::IsOccupiedBy(ref mut entry) = self._data[i]
-        {
-            Some(&mut entry.value)
-        } else {
-            None
-        }
-    }
-
-    pub(crate) fn _get_index_of(&mut self, key: &K) -> Option<usize> {
-        let i = self._find_index(key, true);
-        if i != Self::CAPACITY && self._data[i].is_occupied() {Some(i)} else {None}
-    }
-
-    pub(crate) fn _get_mut_value_and_index_of(&mut self, key: &K) -> Option<(&mut V, usize)> {
-        let i = self._find_index(key, true);
-        if i != Self::CAPACITY && let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
-            Some ((&mut entry.value, i))
-        } else {
-            None
-        }
-    }
-
-    pub(crate) fn _get_val_and_index_of(&self, key: &K) -> Option<(&V, usize)> {
-        let i = self._find_index(key, true);
-        if i != Self::CAPACITY && let Slot::IsOccupiedBy(ref entry) = self._data[i] {
-            Some ((&entry.value, i))
-        } else {
-            None
-        }
-    }
-
-    pub fn remove(&mut self, key: &K) -> Option<V> {
-        let i = self._find_index(key, true);
-        if i == Self::CAPACITY {
-            return None;
-        }
-
-        match self._data[i] {
-            Slot::IsOccupiedBy(_) => {
-                self._size -= 1;
-                self._remove_from_list(i);
-            }
-            _ => {}
-        }
-
-        match self._data[i].take() {
-            Some(entry) => Some(entry.value),
-            None => None,
-        }
-    }
-
-    pub const fn capacity(&self) -> usize {
-        Self::CAPACITY
-    }
-
-    pub fn size(&self) -> usize {
-        self._size
-    }
-
-    pub fn head(&self) -> Option<(&K, &V)> {
-        self._get_key_val_at(self._head)
-    }
-
-    pub fn tail(&self) -> Option<(&K, &V)> {
-        self._get_key_val_at(self._tail)
-    }
-
-    pub fn iter_head(&self) -> MapIterator<'_, K, V, C, impl Fn(&Entry<K, V, C>) -> usize + use<K, V, C, H>> {
-        MapIterator {
-            _remaining: self._size,
-            _current: self._head,
-            _data: &self._data,
-            _fn_next: |entry| entry.next,
-        }
-    }
-
-    pub fn iter_tail(&self) -> MapIterator<'_, K, V, C, impl Fn(&Entry<K, V, C>) -> usize + use<K, V, C, H>> {
-        MapIterator {
-            _remaining: self._size,
-            _current: self._tail,
-            _data: &self._data,
-            _fn_next: |entry| entry.prev,
-        }
     }
 
     fn _get_key_val_at(&self, i: usize) -> Option<(&K, &V)> {
@@ -356,14 +257,113 @@ where
             None
         }
     }
+}
 
-    pub(crate) fn _get_mut_value_at(&mut self, i: usize) -> Option<&mut V> {
-            if i < Self::CAPACITY
-            && let Slot::IsOccupiedBy(ref mut entry) = self._data[i]
+impl<K, V, const C: usize, H> FixedSizeHashMapImpl<K, V, C, H>
+where
+    Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
+    K: Hash + std::cmp::Eq,
+    H: Default + Hasher,
+{
+    const CAPACITY: usize = C;
+    type _Hash = H;
+
+    pub fn new() -> FixedSizeHashMapImpl<K, V, C, H> {
+        let mut map = FixedSizeHashMapImpl::<K, V, C, H> {
+            _data: Vec::new(),
+            _size: 0,
+            _head: Self::CAPACITY,
+            _tail: Self::CAPACITY,
+            _phantom: Default::default(),
+        };
+        map._data.resize_with(Self::CAPACITY, Default::default);
+        map
+    }
+
+    pub fn insert(&mut self, key: K, value: V) -> Result<Option<V>, OutOfCapacityError> {
+        let result = self._insert_get_index(key, value);
+        result.map(|rv| rv.1)
+    }
+
+    pub fn insert_or<F: FnOnce(&mut V)>(&mut self, key: K, value: V, op: F) -> Result<(), OutOfCapacityError> {
+        if let Some(value) = self.get_mut(&key) {
+            op(value);
+            Ok(())
+        } else {
+            self.insert(key, value).map(|_| ())
+        }
+    }
+
+    pub fn exists(&self, key: &K) -> bool {
+        let i = self._find_index(key, true);
+        i != Self::CAPACITY && self._data[i].is_occupied() 
+    }
+
+    pub fn get(&self, key: &K) -> Option<&V> {
+        let i = self._find_index(key, true);
+
+        if i != Self::CAPACITY && let Slot::IsOccupiedBy(ref entry) = self._data[i]
+        {
+            Some(&entry.value)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
+        let i = self._find_index(key, true);
+
+        if i < Self::CAPACITY && let Slot::IsOccupiedBy(ref mut entry) = self._data[i]
         {
             Some(&mut entry.value)
         } else {
             None
+        }
+    }
+
+    pub fn remove(&mut self, key: &K) -> Option<V> {
+        let i = self._find_index(key, true);
+        if i >= Self::CAPACITY || !self._data[i].is_occupied() {
+            return None;
+        }
+
+        self._size -= 1;
+        self._remove_from_list(i);
+
+        self._data[i].take().map(|entry| entry.value)
+    }
+
+    pub const fn capacity(&self) -> usize {
+        Self::CAPACITY
+    }
+
+    pub fn size(&self) -> usize {
+        self._size
+    }
+
+    pub fn head(&self) -> Option<(&K, &V)> {
+        self._get_key_val_at(self._head)
+    }
+
+    pub fn tail(&self) -> Option<(&K, &V)> {
+        self._get_key_val_at(self._tail)
+    }
+
+    pub fn iter_head(&self) -> MapIterator<'_, K, V, C, impl Fn(&Entry<K, V, C>) -> usize + use<K, V, C, H>> {
+        MapIterator {
+            _remaining: self._size,
+            _current: self._head,
+            _data: &self._data,
+            _fn_next: |entry| entry.next,
+        }
+    }
+
+    pub fn iter_tail(&self) -> MapIterator<'_, K, V, C, impl Fn(&Entry<K, V, C>) -> usize + use<K, V, C, H>> {
+        MapIterator {
+            _remaining: self._size,
+            _current: self._tail,
+            _data: &self._data,
+            _fn_next: |entry| entry.prev,
         }
     }
 }
