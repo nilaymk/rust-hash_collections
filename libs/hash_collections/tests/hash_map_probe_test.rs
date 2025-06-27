@@ -56,11 +56,11 @@ fn insert_and_get_colliding_items() {
         Some(&"300".to_string())
     );
     assert_eq!(
-        high_collision_map.head(),
+        high_collision_map.tail(),
         Some((&String::from("baz"), &"300".to_string()))
     );
     assert_eq!(
-        high_collision_map.tail(),
+        high_collision_map.head(),
         Some((&String::from("foo"), &"100".to_string()))
     );
 }

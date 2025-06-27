@@ -114,7 +114,7 @@ where
             Slot::IsOccupiedBy(ref mut entry) => {
                 old_val = Some(mem::replace(&mut entry.value, value));
                 self._remove_from_list(i);
-                self._move_to_front_of_list(i);
+                self._move_to_back_of_list(i);
             }
             Slot::Empty | Slot::WasOccupied => {
                 self._data[i] = Slot::IsOccupiedBy(Entry {
@@ -123,7 +123,7 @@ where
                     next: Self::CAPACITY,
                     prev: Self::CAPACITY,
                 });
-                self._move_to_front_of_list(i);
+                self._move_to_back_of_list(i);
                 self._size += 1;
             }
         }
@@ -294,6 +294,25 @@ where
             }
 
             self._head = i;
+        }
+    }
+
+    fn _move_to_back_of_list(&mut self, i: usize) {
+        if self._size == 0 {
+            debug_assert!(self._head == Self::CAPACITY && self._tail == Self::CAPACITY);
+            self._head = i;
+            self._tail = i;
+        } else {
+            if let Slot::IsOccupiedBy(ref mut entry) = self._data[self._tail] {
+                entry.next = i;
+            }
+
+            if let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
+                entry.prev = self._tail;
+                entry.next = Self::CAPACITY;
+            }
+
+            self._tail = i;
         }
     }
 
