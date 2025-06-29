@@ -1,7 +1,7 @@
 #![cfg(test)]
 use std::hash::Hasher;
 
-use hash_collections::hash_map::{FixedSizeHashMapImpl, OutOfCapacityError};
+use hash_collections::hash_map::{FixedSizeHashMap, OutOfCapacityError};
 
 struct HighCollisionHasher {}
 
@@ -19,7 +19,7 @@ impl Default for HighCollisionHasher {
     }
 }
 
-type MyHighCollisionMap = FixedSizeHashMapImpl<String, String, 7, HighCollisionHasher>;
+type MyHighCollisionMap = FixedSizeHashMap<String, String, 7, HighCollisionHasher>;
 
 fn add_some_data(map: &mut MyHighCollisionMap, num: i32) {
     let keys = ["foo", "bar", "baz", "bat", "boo", "fat", "qux"];

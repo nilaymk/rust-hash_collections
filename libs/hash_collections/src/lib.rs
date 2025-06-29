@@ -7,6 +7,7 @@
 #![feature(inherent_associated_types)]
 
 mod check;
+mod hash_map_internal;
 pub mod hash_map;
 pub mod hash_graph;
 

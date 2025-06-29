@@ -18,13 +18,6 @@ impl fmt::Display for OutOfCapacityError {
 
 impl error::Error for OutOfCapacityError {}
 
-pub struct Entry<K, V, const C: usize> {
-    key: K,
-    value: V,
-    next: usize,
-    prev: usize,
-}
-
 pub enum Slot<T> {
     Empty,
     WasOccupied,
@@ -56,25 +49,40 @@ impl<T> Slot<T> {
     }
 }
 
-pub struct FixedSizeHashMapImpl<K, V, const C: usize, H>
+trait Entry<K, V, const C: usize> {
+    type Type;
+    fn key(&self) -> &K;
+    fn value(&self) -> &V;
+    fn consume_self(self) -> V;
+    fn mut_value(&mut self) -> &mut V;
+    fn next(&self) -> usize;
+    fn mut_next(&mut self) -> &mut usize;
+    fn prev(&self) -> usize;
+    fn mut_prev(&mut self) -> &mut usize;
+    fn new(key: K, value: V) -> Self; 
+}
+
+pub struct FixedSizeHashMapImpl<K, V, const C: usize, H, E>
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
+    E: Entry<K, V, C>
 {
-    _data: Vec<Slot<Entry<K, V, C>>>,
+    _data: Vec<Slot<E>>,
     _size: usize,
     _head: usize,
     _tail: usize,
-    _phantom: PhantomData<H>,
+    _phantom: PhantomData<(K, V, H)>
 }
 
 
-impl<K, V, const C: usize, H> Default for FixedSizeHashMapImpl<K, V, C, H>
+impl<K, V, const C: usize, H, E> Default for FixedSizeHashMapImpl<K, V, C, H, E>
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
+    E: Entry<K, V, C>
 {
     fn default() -> Self {
         Self::new()
@@ -83,11 +91,12 @@ where
 
 
 // hash_map Internals 
-impl<K, V, const C: usize, H> FixedSizeHashMapImpl<K, V, C, H>
+impl<K, V, const C: usize, H, E> FixedSizeHashMapImpl<K, V, C, H, E>
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
+    E: Entry<K, V, C>
 {
     pub(crate) fn _get_index_of(&mut self, key: &K) -> Option<usize> {
         let i = self._find_index(key, true);
@@ -97,7 +106,7 @@ where
     pub(crate) fn _get_mut_value_and_index_of(&mut self, key: &K) -> Option<(&mut V, usize)> {
         let i = self._find_index(key, true);
         if i != Self::CAPACITY && let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
-            Some ((&mut entry.value, i))
+            Some ((entry.mut_value(), i))
         } else {
             None
         }
@@ -106,7 +115,7 @@ where
     pub(crate) fn _get_val_and_index_of(&self, key: &K) -> Option<(&V, usize)> {
         let i = self._find_index(key, true);
         if i != Self::CAPACITY && let Slot::IsOccupiedBy(ref entry) = self._data[i] {
-            Some ((&entry.value, i))
+            Some ((entry.value(), i))
         } else {
             None
         }
@@ -116,7 +125,7 @@ where
         if i < Self::CAPACITY
             && let Slot::IsOccupiedBy(ref mut entry) = self._data[i]
         {
-            Some(&mut entry.value)
+            Some(entry.mut_value())
         } else {
             None
         }
@@ -131,16 +140,16 @@ where
         let mut old_val: Option<V> = None;
         match self._data[i] {
             Slot::IsOccupiedBy(ref mut entry) => {
-                old_val = Some(mem::replace(&mut entry.value, value));
+                old_val = Some(mem::replace(entry.mut_value(), value));
                 self._remove_from_list(i);
                 self._move_to_back_of_list(i);
             }
             Slot::Empty | Slot::WasOccupied => {
-                self._data[i] = Slot::IsOccupiedBy(Entry {
-                    key,
-                    value,
-                    next: Self::CAPACITY,
-                    prev: Self::CAPACITY,
+            self._data[i] = Slot::IsOccupiedBy({
+                    let mut e = E::new(key, value);
+                    *e.mut_next() = Self::CAPACITY;
+                    *e.mut_next() = Self::CAPACITY;
+                    e
                 });
                 self._move_to_back_of_list(i);
                 self._size += 1;
@@ -154,7 +163,7 @@ where
         if i < Self::CAPACITY
             && let Slot::IsOccupiedBy(ref entry) = self._data[i]
         {
-            Some((&entry.key, &entry.value))
+            Some((entry.key(), entry.value()))
         } else {
             None
         }
@@ -167,7 +176,7 @@ where
         let mut index = already_visited;
 
         while match self._data[index] {
-            Slot::IsOccupiedBy(ref entry) => entry.key != *key,
+            Slot::IsOccupiedBy(ref entry) => *entry.key() != *key,
             Slot::WasOccupied => key_must_exist,
             Slot::Empty => false,
         } {
@@ -186,12 +195,12 @@ where
             self._tail = i;
         } else {
             if let Slot::IsOccupiedBy(ref mut entry) = self._data[self._head] {
-                entry.prev = i;
+                *entry.mut_prev() = i;
             }
 
             if let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
-                entry.next = self._head;
-                entry.prev = Self::CAPACITY;
+                *entry.mut_next() = self._head;
+                *entry.mut_prev() = Self::CAPACITY;
             }
 
             self._head = i;
@@ -205,12 +214,12 @@ where
             self._tail = i;
         } else {
             if let Slot::IsOccupiedBy(ref mut entry) = self._data[self._tail] {
-                entry.next = i;
+                *entry.mut_next() = i;
             }
 
             if let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
-                entry.prev = self._tail;
-                entry.next = Self::CAPACITY;
+                *entry.mut_prev() = self._tail;
+                *entry.mut_next() = Self::CAPACITY;
             }
 
             self._tail = i;
@@ -223,15 +232,15 @@ where
 
         match self._data[i] {
             Slot::IsOccupiedBy(ref entry) => {
-                entry_next = entry.next;
-                entry_prev = entry.prev;
+                entry_next = entry.next();
+                entry_prev = entry.prev();
             }
             _ => {}
         }
 
         if entry_prev != Self::CAPACITY {
             match self._data[entry_prev] {
-                Slot::IsOccupiedBy(ref mut entry) => entry.next = entry_next,
+                Slot::IsOccupiedBy(ref mut entry) => *entry.mut_next() = entry_next,
                 _ => {}
             }
         } else {
@@ -240,7 +249,7 @@ where
 
         if entry_next != Self::CAPACITY {
             match self._data[entry_next] {
-                Slot::IsOccupiedBy(ref mut entry) => entry.prev = entry_prev,
+                Slot::IsOccupiedBy(ref mut entry) => *entry.mut_prev() = entry_prev,
                 _ => {}
             }
         } else {
@@ -248,7 +257,7 @@ where
         }
     }
 
-    fn _get_entry_at(&self, i: usize) -> Option<&Entry<K, V, C>> {
+    fn _get_entry_at(&self, i: usize) -> Option<&E> {
         if i < Self::CAPACITY
             && let Slot::IsOccupiedBy(ref entry) = self._data[i]
         {
@@ -259,17 +268,18 @@ where
     }
 }
 
-impl<K, V, const C: usize, H> FixedSizeHashMapImpl<K, V, C, H>
+impl<K, V, const C: usize, H, E> FixedSizeHashMapImpl<K, V, C, H, E>
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
+    E: Entry<K, V, C>
 {
     const CAPACITY: usize = C;
     type _Hash = H;
 
-    pub fn new() -> FixedSizeHashMapImpl<K, V, C, H> {
-        let mut map = FixedSizeHashMapImpl::<K, V, C, H> {
+    pub fn new() -> FixedSizeHashMapImpl<K, V, C, H, E> {
+        let mut map = FixedSizeHashMapImpl::<K, V, C, H, E> {
             _data: Vec::new(),
             _size: 0,
             _head: Self::CAPACITY,
@@ -304,7 +314,7 @@ where
 
         if i != Self::CAPACITY && let Slot::IsOccupiedBy(ref entry) = self._data[i]
         {
-            Some(&entry.value)
+            Some(entry.value())
         } else {
             None
         }
@@ -315,7 +325,7 @@ where
 
         if i < Self::CAPACITY && let Slot::IsOccupiedBy(ref mut entry) = self._data[i]
         {
-            Some(&mut entry.value)
+            Some(entry.mut_value())
         } else {
             None
         }
@@ -330,7 +340,7 @@ where
         self._size -= 1;
         self._remove_from_list(i);
 
-        self._data[i].take().map(|entry| entry.value)
+        self._data[i].take().map(|entry| entry.consume_self())
     }
 
     pub const fn capacity(&self) -> usize {
@@ -349,30 +359,33 @@ where
         self._get_key_val_at(self._tail)
     }
 
-    pub fn iter_head(&self) -> MapIterator<'_, K, V, C, impl Fn(&Entry<K, V, C>) -> usize + use<K, V, C, H>> {
+    pub fn iter_head(&self) -> MapIterator<'_, K, V, E, C, impl Fn(&E) -> usize + use<K, V, C, H, E>> {
         MapIterator {
             _remaining: self._size,
             _current: self._head,
             _data: &self._data,
-            _fn_next: |entry| entry.next,
+            _fn_next: |entry| entry.next(),
+            _phantom: Default::default(),
         }
     }
 
-    pub fn iter_tail(&self) -> MapIterator<'_, K, V, C, impl Fn(&Entry<K, V, C>) -> usize + use<K, V, C, H>> {
+    pub fn iter_tail(&self) -> MapIterator<'_, K, V, E, C, impl Fn(&E) -> usize + use<K, V, C, H, E>> {
         MapIterator {
             _remaining: self._size,
             _current: self._tail,
             _data: &self._data,
-            _fn_next: |entry| entry.prev,
+            _fn_next: |entry| entry.prev(),
+            _phantom: Default::default(),
         }
     }
 }
 
-impl<'a, K: 'a, V: 'a, const C: usize, H> Index<&K> for FixedSizeHashMapImpl<K, V, C, H>
+impl<'a, K: 'a, V: 'a, const C: usize, H, E> Index<&K> for FixedSizeHashMapImpl<K, V, C, H, E>
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
+    E: Entry<K, V, C>
 {
     type Output = V;
     fn index(&self, key: &K) -> &Self::Output {
@@ -380,30 +393,34 @@ where
     }
 }
 
-impl<K, V, const C: usize, H> IndexMut<&K> for FixedSizeHashMapImpl<K, V, C, H>
+impl<K, V, const C: usize, H, E> IndexMut<&K> for FixedSizeHashMapImpl<K, V, C, H, E>
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
+    E: Entry<K, V, C>
 {
     fn index_mut(&mut self, key: &K) -> &mut Self::Output {
         self.get_mut(key).expect("Panic! not in map")
     }
 }
 
-pub struct MapIterator<'a, K: 'a, V: 'a, const C: usize, Next>
+pub struct MapIterator<'a, K: 'a, V: 'a, E: 'a, const C: usize, Next>
 where
-    Next: Fn(&Entry<K, V, C>) -> usize,
+    Next: Fn(&E) -> usize,
+    E: Entry<K, V, C>
 {
     _remaining: usize,
     _current: usize,
-    _data: &'a Vec<Slot<Entry<K, V, C>>>,
+    _data: &'a Vec<Slot<E>>,
     _fn_next: Next,
+    _phantom: PhantomData<(K, V)>
 }
 
-impl<'a, K: 'a, V: 'a, const C: usize, Next> Iterator for MapIterator<'a, K, V, C, Next>
+impl<'a, K: 'a, V: 'a, E: 'a, const C: usize, Next> Iterator for MapIterator<'a, K, V, E, C, Next>
 where
-    Next: Fn(&Entry<K, V, C>) -> usize,
+    E: Entry<K, V, C>,
+    Next: Fn(&E) -> usize,
 {
     type Item = (&'a K, &'a V);
 
@@ -413,7 +430,7 @@ where
         {
             self._remaining -= 1;
             self._current = (self._fn_next)(entry);
-            Some((&entry.key, &entry.value))
+            Some((entry.key(), entry.value()))
         } else {
             None
         }
@@ -428,6 +445,34 @@ where
     }
 }
 
-pub type FixedSizeHashMap<K, V, const C: usize> = FixedSizeHashMapImpl<K, V, C, DefaultHasher>;
 
-pub type FixedSizeHashSet<K, const C: usize> = FixedSizeHashMapImpl<K, (), C, DefaultHasher>;
+pub struct MapEntry<K, V, const C: usize> {
+    key: K,
+    value: V,
+    next: usize,
+    prev: usize,
+}
+
+impl<K, V, const C: usize> Entry<K, V, C> for MapEntry<K, V, C> {
+    type Type = MapEntry<K, V, C>;
+    fn key(&self) -> &K {&self.key}
+    fn value(&self) -> &V {&self.value}
+    fn consume_self(self) -> V {self.value}
+    fn mut_value(&mut self) -> &mut V {&mut self.value}
+    fn next(&self) -> usize {self.next}
+    fn mut_next(&mut self) -> &mut usize {&mut self.next}
+    fn prev(&self) -> usize {self.prev}
+    fn mut_prev(&mut self) -> &mut usize {&mut self.prev}
+    fn new(key: K, value: V) -> Self {
+        Self {
+            key: key,
+            value: value,
+            next: C,
+            prev: C,
+        }
+    }
+}
+
+pub type FixedSizeHashMap<K, V, const C: usize, H=DefaultHasher> = FixedSizeHashMapImpl<K, V, C, H, MapEntry<K, V, C>>;
+
+pub type FixedSizeHashSet<K, const C: usize> = FixedSizeHashMapImpl<K, (), C, DefaultHasher, MapEntry<K, (), C>>;

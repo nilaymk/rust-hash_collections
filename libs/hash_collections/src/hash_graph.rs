@@ -20,7 +20,7 @@ where
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
 {
-    _hash_map: FixedSizeHashMapImpl<K, Node<V>, C, H>,
+    _hash_map: FixedSizeHashMap<K, Node<V>, C, H>,
 }
 
 impl<'a, K: 'a, V: 'a, const C: usize, H> FixedSizeHashGraphImpl<K, V, C, H>
@@ -127,13 +127,14 @@ where
         let Some(index) = self._hash_map._get_index_of(key) else {return};
         
         for to_key in to_keys {
-            if let Some((to_node, to_index)) = self._hash_map._get_mut_value_and_index_of(to_key) {
-                to_node._connected_from.remove(&index);
-
+            if let Some(to_index) = self._hash_map._get_index_of(to_key) {
                 if let Some(node) = self._hash_map._get_mut_value_at(index){
                     if let Some(edge_weight) = node._connected_to.get_mut(&to_index) {
                         if *edge_weight == 1 {
                             node._connected_to.remove(&to_index);
+                            if let Some(to_node) = self._hash_map._get_mut_value_at(to_index) {
+                                to_node._connected_from.remove(&index);
+                            }
                         } else {
                             *edge_weight-=1;
                         }
