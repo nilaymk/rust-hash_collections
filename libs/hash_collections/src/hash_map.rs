@@ -15,7 +15,6 @@ pub struct MapEntry<K, V, const C: usize> {
 }
 
 impl<K, V, const C: usize> Entry<K, V, C> for MapEntry<K, V, C> {
-    type Type = MapEntry<K, V, C>;
     fn key(&self) -> &K {&self._key}
     fn value(&self) -> &V {&self._value}
     fn consume_self(self) -> V {self._value}
@@ -43,6 +42,17 @@ where
     _hash_map_internal: FixedSizeHashMapImpl<K, V, C, H, MapEntry<K, V, C>>
 }
 
+impl<K, V, const C: usize, H> Default for FixedSizeHashMap<K, V, C, H>
+where
+    Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
+    K: Hash + std::cmp::Eq,
+    H: Default + Hasher,
+{
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl<K, V, const C: usize, H> FixedSizeHashMap<K, V, C, H>
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
@@ -59,7 +69,7 @@ where
     }
 
     pub fn insert(&mut self, key: K, value: V) -> Result<Option<V>, OutOfCapacityError> {
-        let result = self._hash_map_internal._insert_get_index(key, value);
+        let result = self._hash_map_internal.insert_get_index(key, value);
         result.map(|rv| rv.1)
     }
 
@@ -77,15 +87,15 @@ where
     }
 
     pub fn get(&self, key: &K) -> Option<&V> {
-        self._hash_map_internal._get_val_and_index_of(key).map(|kv| kv.0)
+        self._hash_map_internal.get_entry_and_index_of(key).map(|e| e.0.value())
     }
 
     pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
-         self._hash_map_internal._get_mut_value_and_index_of(key).map(|kv| kv.0)
+         self._hash_map_internal.get_mut_entry_and_index_of(key).map(|e| e.0.mut_value())
     }
 
     pub fn remove(&mut self, key: &K) -> Option<V> {
-        self._hash_map_internal.remove(key)
+        self._hash_map_internal.remove(key).map(|e| e.consume_self())
     }
 
     pub const fn capacity(&self) -> usize {
@@ -97,11 +107,12 @@ where
     }
 
     pub fn head(&self) -> Option<(&K, &V)> {
-        self._hash_map_internal.head()
+        self._hash_map_internal.head().map(|e| (e.key(), e.value()))
+
     }
 
     pub fn tail(&self) -> Option<(&K, &V)> {
-        self._hash_map_internal.tail()
+        self._hash_map_internal.tail().map(|e| (e.key(), e.value()))
     }
 
     pub fn iter_head(&self) -> MapIterator<'_, K, V, MapEntry<K, V, C>, C, impl Fn(&MapEntry<K, V, C>) -> usize + use<K, V, C, H>> {

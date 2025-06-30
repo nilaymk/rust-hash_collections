@@ -49,7 +49,6 @@ impl<T> Slot<T> {
 }
 
 pub(crate) trait Entry<K, V, const C: usize> {
-    type Type;
     fn key(&self) -> &K;
     fn value(&self) -> &V;
     fn consume_self(self) -> V;
@@ -97,40 +96,46 @@ where
     H: Default + Hasher,
     E: Entry<K, V, C>
 {
-    pub fn _get_index_of(&mut self, key: &K) -> Option<usize> {
+    pub fn get_index_of(&mut self, key: &K) -> Option<usize> {
         let i = self._find_index(key, true);
         if i != Self::CAPACITY && self._data[i].is_occupied() {Some(i)} else {None}
     }
 
-    pub fn _get_mut_value_and_index_of(&mut self, key: &K) -> Option<(&mut V, usize)> {
+    pub fn get_mut_entry_and_index_of(&mut self, key: &K) -> Option<(&mut E, usize)> {
         let i = self._find_index(key, true);
         if i != Self::CAPACITY && let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
-            Some ((entry.mut_value(), i))
+            Some ((entry, i))
         } else {
             None
         }
     }
 
-    pub fn _get_val_and_index_of(&self, key: &K) -> Option<(&V, usize)> {
+    pub fn get_entry_and_index_of(&self, key: &K) -> Option<(&E, usize)> {
         let i = self._find_index(key, true);
         if i != Self::CAPACITY && let Slot::IsOccupiedBy(ref entry) = self._data[i] {
-            Some ((entry.value(), i))
+            Some ((entry, i))
         } else {
             None
         }
     }
 
-    pub fn _get_mut_value_at(&mut self, i: usize) -> Option<&mut V> {
-        if i < Self::CAPACITY
-            && let Slot::IsOccupiedBy(ref mut entry) = self._data[i]
-        {
-            Some(entry.mut_value())
+    pub fn get_mut_entry_at(&mut self, i: usize) -> Option<&mut E> {
+        if i < Self::CAPACITY && let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
+            Some (entry)
         } else {
             None
         }
     }
 
-    pub fn _insert_get_index(&mut self, key: K, value: V) -> Result<(usize, Option<V>), OutOfCapacityError> {
+    pub fn get_entry_at(&self, i: usize) -> Option<&E> {
+        if i < Self::CAPACITY && let Slot::IsOccupiedBy(ref entry) = self._data[i] {
+            Some (entry)
+        } else {
+            None
+        }
+    }
+
+    pub fn insert_get_index(&mut self, key: K, value: V) -> Result<(usize, Option<V>), OutOfCapacityError> {
         let i = self._find_index(&key, false);
         if i == Self::CAPACITY {
             return Result::Err(OutOfCapacityError{capacity: Self::CAPACITY});
@@ -139,7 +144,6 @@ where
         let mut old_val: Option<V> = None;
         match self._data[i] {
             Slot::IsOccupiedBy(ref mut entry) => {
-
                 old_val = Some(mem::replace(entry.mut_value(), value));
                 self._remove_from_list(i);
                 self._move_to_back_of_list(i);
@@ -159,17 +163,7 @@ where
         Result::Ok((i, old_val))
     }
 
-    pub fn _get_key_val_at(&self, i: usize) -> Option<(&K, &V)> {
-        if i < Self::CAPACITY
-            && let Slot::IsOccupiedBy(ref entry) = self._data[i]
-        {
-            Some((entry.key(), entry.value()))
-        } else {
-            None
-        }
-    }
-
-    pub fn _find_index(&self, key: &K, key_must_exist: bool) -> usize {
+    fn _find_index(&self, key: &K, key_must_exist: bool) -> usize {
         let mut hash_state: Self::_Hash = Default::default();
         key.hash(&mut hash_state);
         let already_visited = (hash_state.finish() % Self::CAPACITY as u64) as usize;
@@ -188,7 +182,7 @@ where
         index
     }
 
-    pub fn _move_to_front_of_list(&mut self, i: usize) {
+    fn _move_to_front_of_list(&mut self, i: usize) {
         if self._size == 0 {
             debug_assert!(self._head == Self::CAPACITY && self._tail == Self::CAPACITY);
             self._head = i;
@@ -207,7 +201,7 @@ where
         }
     }
 
-    pub fn _move_to_back_of_list(&mut self, i: usize) {
+    fn _move_to_back_of_list(&mut self, i: usize) {
         if self._size == 0 {
             debug_assert!(self._head == Self::CAPACITY && self._tail == Self::CAPACITY);
             self._head = i;
@@ -226,7 +220,7 @@ where
         }
     }
 
-    pub fn _remove_from_list(&mut self, i: usize) {
+    fn _remove_from_list(&mut self, i: usize) {
         let mut entry_next = Self::CAPACITY;
         let mut entry_prev = Self::CAPACITY;
 
@@ -254,16 +248,6 @@ where
             }
         } else {
             self._tail = entry_prev;
-        }
-    }
-
-    pub fn _get_entry_at(&self, i: usize) -> Option<&E> {
-        if i < Self::CAPACITY
-            && let Slot::IsOccupiedBy(ref entry) = self._data[i]
-        {
-            Some(entry)
-        } else {
-            None
         }
     }
 }
@@ -295,29 +279,7 @@ where
         i != Self::CAPACITY && self._data[i].is_occupied() 
     }
 
-    pub fn get(&self, key: &K) -> Option<&V> {
-        let i = self._find_index(key, true);
-
-        if i != Self::CAPACITY && let Slot::IsOccupiedBy(ref entry) = self._data[i]
-        {
-            Some(entry.value())
-        } else {
-            None
-        }
-    }
-
-    pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
-        let i = self._find_index(key, true);
-
-        if i < Self::CAPACITY && let Slot::IsOccupiedBy(ref mut entry) = self._data[i]
-        {
-            Some(entry.mut_value())
-        } else {
-            None
-        }
-    }
-
-    pub fn remove(&mut self, key: &K) -> Option<V> {
+    pub fn remove(&mut self, key: &K) -> Option<E> {
         let i = self._find_index(key, true);
         if i >= Self::CAPACITY || !self._data[i].is_occupied() {
             return None;
@@ -326,7 +288,7 @@ where
         self._size -= 1;
         self._remove_from_list(i);
 
-        self._data[i].take().map(|entry| entry.consume_self())
+        self._data[i].take()
     }
 
     pub const fn capacity(&self) -> usize {
@@ -337,12 +299,20 @@ where
         self._size
     }
 
-    pub fn head(&self) -> Option<(&K, &V)> {
-        self._get_key_val_at(self._head)
+    pub fn head(&self) -> Option<&E> {
+        self.get_entry_at(self._head)
     }
 
-    pub fn tail(&self) -> Option<(&K, &V)> {
-        self._get_key_val_at(self._tail)
+    pub fn tail(&self) -> Option<&E> {
+        self.get_entry_at(self._tail)
+    }
+
+    pub fn mut_head(&mut self) -> Option<&mut E> {
+        self.get_mut_entry_at(self._head)
+    }
+
+    pub fn mut_tail(&mut self) -> Option<&mut E> {
+        self.get_mut_entry_at(self._tail)
     }
 
     pub fn iter_head(&self) -> MapIteratorImpl<'_, K, V, E, C, impl Fn(&E) -> usize + use<K, V, C, H, E>> {
