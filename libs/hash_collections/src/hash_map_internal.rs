@@ -89,6 +89,11 @@ where
     }
 }
 
+#[derive(PartialEq)]
+enum FindIndexPurpose{
+    FindSlotForInsertion,
+    FindIfEntryExists
+}
 
 // hash_map Internals 
 impl<K, V, const C: usize, H, E> FixedSizeHashMapImpl<K, V, C, H, E>
@@ -99,12 +104,12 @@ where
     E: Entry<K, V, C>
 {
     pub fn get_index_of(&self, key: &K) -> Option<usize> {
-        let i = self._find_index(key, true);
+        let i = self._find_index(key, FindIndexPurpose::FindIfEntryExists);
         if i != Self::CAPACITY && self._data[i].is_occupied() {Some(i)} else {None}
     }
 
     pub fn get_mut_entry_and_index_of(&mut self, key: &K) -> Option<(&mut E, usize)> {
-        let i = self._find_index(key, true);
+        let i = self._find_index(key, FindIndexPurpose::FindIfEntryExists);
         if i != Self::CAPACITY && let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
             Some ((entry, i))
         } else {
@@ -113,7 +118,7 @@ where
     }
 
     pub fn get_entry_and_index_of(&self, key: &K) -> Option<(&E, usize)> {
-        let i = self._find_index(key, true);
+        let i = self._find_index(key, FindIndexPurpose::FindIfEntryExists);
         if i != Self::CAPACITY && let Slot::IsOccupiedBy(ref entry) = self._data[i] {
             Some ((entry, i))
         } else {
@@ -122,7 +127,7 @@ where
     }
 
     pub fn get_mut_entry_at(&mut self, i: usize) -> Option<&mut E> {
-        if i < Self::CAPACITY && let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
+        if i != Self::CAPACITY && let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
             Some (entry)
         } else {
             None
@@ -130,7 +135,7 @@ where
     }
 
     pub fn get_entry_at(&self, i: usize) -> Option<&E> {
-        if i < Self::CAPACITY && let Slot::IsOccupiedBy(ref entry) = self._data[i] {
+        if i != Self::CAPACITY && let Slot::IsOccupiedBy(ref entry) = self._data[i] {
             Some (entry)
         } else {
             None
@@ -138,7 +143,7 @@ where
     }
 
     pub fn insert_get_index(&mut self, key: K, value: V) -> Result<(usize, Option<V>), OutOfCapacityError> {
-        let i = self._find_index(&key, false);
+        let i = self._find_index(&key, FindIndexPurpose::FindSlotForInsertion);
         if i == Self::CAPACITY {
             return Result::Err(OutOfCapacityError{capacity: Self::CAPACITY});
         }
@@ -163,21 +168,25 @@ where
         Result::Ok((i, old_val))
     }
 
-    fn _find_index(&self, key: &K, key_must_exist: bool) -> usize {
+    fn _find_index(&self, key: &K, purpose: FindIndexPurpose) -> usize {
         let mut hash_state: Self::_Hash = Default::default();
         key.hash(&mut hash_state);
         let already_visited = (hash_state.finish() % Self::CAPACITY as u64) as usize;
         let mut index = already_visited;
+        let mut key_not_found = true;
 
         while match self._data[index] {
-            Slot::IsOccupiedBy(ref entry) => *entry.key() != *key,
-            Slot::WasOccupied => key_must_exist,
-            Slot::Empty => false,
+            Slot::IsOccupiedBy(ref entry) => {key_not_found = *entry.key() != *key; key_not_found},
+            Slot::WasOccupied => {purpose == FindIndexPurpose::FindIfEntryExists},
+            Slot::Empty => {false},
         } {
             index = (index + 1) % Self::CAPACITY; // linear probing
             if index == already_visited {
                 return Self::CAPACITY;
             }
+        }
+        if FindIndexPurpose::FindIfEntryExists == purpose && key_not_found {
+            index = Self::CAPACITY;
         }
         index
     }
@@ -188,8 +197,8 @@ where
             self._head = i;
             self._tail = i;
         } else {
-            if let Slot::IsOccupiedBy(ref mut entry) = self._data[self._tail] {
-                *entry.mut_next() = i;
+            if let Slot::IsOccupiedBy(ref mut tail_entry) = self._data[self._tail] {
+                *tail_entry.mut_next() = i;
             }
 
             if let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
@@ -221,44 +230,35 @@ where
 
     fn _remove_from_list(&mut self, i: usize) {
         debug_assert!(self._size != 0);
+
+        let mut entry_next = Self::CAPACITY;
+        let mut entry_prev = Self::CAPACITY;
+        if let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
+            entry_next = mem::replace(entry.mut_next(), Self::CAPACITY);
+            entry_prev = mem::replace(entry.mut_prev(), Self::CAPACITY);
+        }
+
         if self._size == 1 {
             self._head = Self::CAPACITY;
             self._tail = Self::CAPACITY;
         } else {
-            let mut entry_next = Self::CAPACITY;
-            let mut entry_prev = Self::CAPACITY;
-
-            match self._data[i] {
-                Slot::IsOccupiedBy(ref entry) => {
-                    entry_next = entry.next();
-                    entry_prev = entry.prev();
-                }
-                _ => {}
-            }
-
             if entry_prev != Self::CAPACITY {
-                match self._data[entry_prev] {
-                    Slot::IsOccupiedBy(ref mut entry) => *entry.mut_next() = entry_next,
-                    _ => {}
+                if let Slot::IsOccupiedBy(ref mut prev_entry) = self._data[entry_prev] {
+                    *prev_entry.mut_next() = entry_next;
                 }
             } else {
                 self._head = entry_next;
             }
 
             if entry_next != Self::CAPACITY {
-                match self._data[entry_next] {
-                    Slot::IsOccupiedBy(ref mut entry) => *entry.mut_prev() = entry_prev,
-                    _ => {}
+                if let Slot::IsOccupiedBy(ref mut next_entry) = self._data[entry_next] {
+                    *next_entry.mut_prev() = entry_prev;
                 }
             } else {
                 self._tail = entry_prev;
             }
         }
         self._size-=1;
-        if let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
-            *entry.mut_next() = Self::CAPACITY;
-            *entry.mut_next() = Self::CAPACITY;
-        }
     }
 }
 
@@ -285,15 +285,16 @@ where
     }
 
     pub fn exists(&self, key: &K) -> bool {
-        let i = self._find_index(key, true);
-        i != Self::CAPACITY && self._data[i].is_occupied() 
+        self._find_index(key, FindIndexPurpose::FindIfEntryExists) != Self::CAPACITY 
     }
 
     pub fn remove(&mut self, key: &K) -> Option<E> {
-        let i = self._find_index(key, true);
-        if i >= Self::CAPACITY || !self._data[i].is_occupied() {
+        let i = self._find_index(key, FindIndexPurpose::FindIfEntryExists);
+        if i == Self::CAPACITY {
             return None;
         }
+
+        debug_assert!(self._data[i].is_occupied());
 
         self._remove_from_list(i);
 
