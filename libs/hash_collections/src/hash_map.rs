@@ -3,10 +3,11 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::ops::{Index, IndexMut};
 
-use crate::check::{Check, IsTrue, is_prime_and_within_limit};
-use crate::hash_map_internal::{Entry, FixedSizeHashMapImpl};
-
-pub use crate::hash_map_internal::{MapIteratorImpl, OutOfCapacityError};
+use crate::{
+    check::{Check, IsTrue, is_prime_and_within_limit},
+    hash_map_internal::{Entry, FixedSizeHashMapImpl, MapIteratorImpl},
+    OutOfCapacityError
+};
 
 pub struct MapEntry<K, V, const C: usize> {
     _key: K,

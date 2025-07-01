@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use hash_collections::FixedSizeHashGraphMap;
+use crate::FixedSizeHashGraphMap;
 
 type MyGraph = FixedSizeHashGraphMap<String, (), 97>;
 

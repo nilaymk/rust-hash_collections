@@ -1,6 +1,6 @@
 #![cfg(test)]
 
-use hash_collections::FixedSizeHashMap;
+use crate::FixedSizeHashMap;
 
 type MyMap = FixedSizeHashMap<String, u64, 13>;
 

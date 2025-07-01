@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 
-use crate::hash_map::{FixedSizeHashMap, FixedSizeHashSet, OutOfCapacityError};
 use crate::{
-    hash_map::MapIter,
+    hash_map::{MapIter, FixedSizeHashMap, FixedSizeHashSet},
     hash_map_internal::{Entry, FixedSizeHashMapImpl},
+    OutOfCapacityError
 };
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::mem;

@@ -14,10 +14,3 @@ version = "0.1.0"
 dependencies = [
  "const-primes",
 ]
-
-[[package]]
-name = "hash_perf"
-version = "0.1.0"
-dependencies = [
- "hash_collections",
-]

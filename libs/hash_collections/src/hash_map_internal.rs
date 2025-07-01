@@ -1,29 +1,13 @@
 #![allow(dead_code)]
 
-use std::error;
-use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::mem;
 
-use crate::check::{Check, IsTrue, is_prime_and_within_limit};
-
-#[derive(Debug, Clone, PartialEq)]
-pub struct OutOfCapacityError {
-    pub capacity: usize,
-}
-
-impl fmt::Display for OutOfCapacityError {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(
-            f,
-            "HashMap has reached its capacity of {} entries",
-            self.capacity
-        )
-    }
-}
-
-impl error::Error for OutOfCapacityError {}
+use crate::{
+    check::{Check, IsTrue, is_prime_and_within_limit},
+    OutOfCapacityError
+};
 
 pub enum Slot<T> {
     Empty,
@@ -372,7 +356,7 @@ where
     }
 }
 
-pub struct MapIteratorImpl<'a, K: 'a, V: 'a, E: 'a, const C: usize>
+pub(crate) struct MapIteratorImpl<'a, K: 'a, V: 'a, E: 'a, const C: usize>
 where
     E: Entry<K, V, C>,
 {
