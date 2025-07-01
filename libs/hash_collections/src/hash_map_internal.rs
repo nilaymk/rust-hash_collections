@@ -1,19 +1,25 @@
 #![allow(dead_code)]
 
+use std::error;
+use std::fmt;
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::mem;
-use std::error;
-use std::fmt;
 
 use crate::check::{Check, IsTrue, is_prime_and_within_limit};
 
 #[derive(Debug, Clone, PartialEq)]
-pub struct OutOfCapacityError {pub capacity: usize}
+pub struct OutOfCapacityError {
+    pub capacity: usize,
+}
 
 impl fmt::Display for OutOfCapacityError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        write!(f, "HashMap has reached its capacity of {} entries", self.capacity)
+        write!(
+            f,
+            "HashMap has reached its capacity of {} entries",
+            self.capacity
+        )
     }
 }
 
@@ -59,7 +65,7 @@ pub(crate) trait Entry<K, V, const C: usize> {
     fn mut_next(&mut self) -> &mut usize;
     fn prev(&self) -> usize;
     fn mut_prev(&mut self) -> &mut usize;
-    fn new(key: K, value: V) -> Self; 
+    fn new(key: K, value: V) -> Self;
 }
 
 pub(crate) struct FixedSizeHashMapImpl<K, V, const C: usize, H, E>
@@ -67,22 +73,21 @@ where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
-    E: Entry<K, V, C>
+    E: Entry<K, V, C>,
 {
     _data: Vec<Slot<E>>,
     _size: usize,
     _head: usize,
     _tail: usize,
-    _phantom: PhantomData<(K, V, H)>
+    _phantom: PhantomData<(K, V, H)>,
 }
-
 
 impl<K, V, const C: usize, H, E> Default for FixedSizeHashMapImpl<K, V, C, H, E>
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
-    E: Entry<K, V, C>
+    E: Entry<K, V, C>,
 {
     fn default() -> Self {
         Self::new()
@@ -90,28 +95,34 @@ where
 }
 
 #[derive(PartialEq)]
-enum FindIndexPurpose{
+enum FindIndexPurpose {
     FindSlotForInsertion,
-    FindIfEntryExists
+    FindIfEntryExists,
 }
 
-// hash_map Internals 
+// hash_map Internals
 impl<K, V, const C: usize, H, E> FixedSizeHashMapImpl<K, V, C, H, E>
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
-    E: Entry<K, V, C>
+    E: Entry<K, V, C>,
 {
     pub fn get_index_of(&self, key: &K) -> Option<usize> {
         let i = self._find_index(key, FindIndexPurpose::FindIfEntryExists);
-        if i != Self::CAPACITY && self._data[i].is_occupied() {Some(i)} else {None}
+        if i != Self::CAPACITY && self._data[i].is_occupied() {
+            Some(i)
+        } else {
+            None
+        }
     }
 
     pub fn get_mut_entry_and_index_of(&mut self, key: &K) -> Option<(&mut E, usize)> {
         let i = self._find_index(key, FindIndexPurpose::FindIfEntryExists);
-        if i != Self::CAPACITY && let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
-            Some ((entry, i))
+        if i != Self::CAPACITY
+            && let Slot::IsOccupiedBy(ref mut entry) = self._data[i]
+        {
+            Some((entry, i))
         } else {
             None
         }
@@ -119,33 +130,45 @@ where
 
     pub fn get_entry_and_index_of(&self, key: &K) -> Option<(&E, usize)> {
         let i = self._find_index(key, FindIndexPurpose::FindIfEntryExists);
-        if i != Self::CAPACITY && let Slot::IsOccupiedBy(ref entry) = self._data[i] {
-            Some ((entry, i))
+        if i != Self::CAPACITY
+            && let Slot::IsOccupiedBy(ref entry) = self._data[i]
+        {
+            Some((entry, i))
         } else {
             None
         }
     }
 
     pub fn get_mut_entry_at(&mut self, i: usize) -> Option<&mut E> {
-        if i != Self::CAPACITY && let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
-            Some (entry)
+        if i != Self::CAPACITY
+            && let Slot::IsOccupiedBy(ref mut entry) = self._data[i]
+        {
+            Some(entry)
         } else {
             None
         }
     }
 
     pub fn get_entry_at(&self, i: usize) -> Option<&E> {
-        if i != Self::CAPACITY && let Slot::IsOccupiedBy(ref entry) = self._data[i] {
-            Some (entry)
+        if i != Self::CAPACITY
+            && let Slot::IsOccupiedBy(ref entry) = self._data[i]
+        {
+            Some(entry)
         } else {
             None
         }
     }
 
-    pub fn insert_get_index(&mut self, key: K, value: V) -> Result<(usize, Option<V>), OutOfCapacityError> {
+    pub fn insert_get_index(
+        &mut self,
+        key: K,
+        value: V,
+    ) -> Result<(usize, Option<V>), OutOfCapacityError> {
         let i = self._find_index(&key, FindIndexPurpose::FindSlotForInsertion);
         if i == Self::CAPACITY {
-            return Result::Err(OutOfCapacityError{capacity: Self::CAPACITY});
+            return Result::Err(OutOfCapacityError {
+                capacity: Self::CAPACITY,
+            });
         }
 
         let mut old_val: Option<V> = None;
@@ -155,7 +178,7 @@ where
                 self._move_to_back_of_list(i);
             }
             Slot::Empty | Slot::WasOccupied => {
-            self._data[i] = Slot::IsOccupiedBy({
+                self._data[i] = Slot::IsOccupiedBy({
                     let mut e = E::new(key, value);
                     *e.mut_next() = Self::CAPACITY;
                     *e.mut_next() = Self::CAPACITY;
@@ -176,9 +199,12 @@ where
         let mut key_not_found = true;
 
         while match self._data[index] {
-            Slot::IsOccupiedBy(ref entry) => {key_not_found = *entry.key() != *key; key_not_found},
-            Slot::WasOccupied => {purpose == FindIndexPurpose::FindIfEntryExists},
-            Slot::Empty => {false},
+            Slot::IsOccupiedBy(ref entry) => {
+                key_not_found = *entry.key() != *key;
+                key_not_found
+            }
+            Slot::WasOccupied => purpose == FindIndexPurpose::FindIfEntryExists,
+            Slot::Empty => false,
         } {
             index = (index + 1) % Self::CAPACITY; // linear probing
             if index == already_visited {
@@ -192,7 +218,7 @@ where
     }
 
     fn _add_to_list(&mut self, i: usize) {
-        if self._size == 0{
+        if self._size == 0 {
             debug_assert!(self._head == Self::CAPACITY && self._tail == Self::CAPACITY);
             self._head = i;
             self._tail = i;
@@ -208,7 +234,7 @@ where
 
             self._tail = i;
         }
-        self._size+=1;
+        self._size += 1;
     }
 
     fn _move_to_back_of_list(&mut self, i: usize) {
@@ -258,7 +284,7 @@ where
                 self._tail = entry_prev;
             }
         }
-        self._size-=1;
+        self._size -= 1;
     }
 }
 
@@ -267,7 +293,7 @@ where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
-    E: Entry<K, V, C>
+    E: Entry<K, V, C>,
 {
     pub const CAPACITY: usize = C;
     type _Hash = H;
@@ -285,7 +311,7 @@ where
     }
 
     pub fn exists(&self, key: &K) -> bool {
-        self._find_index(key, FindIndexPurpose::FindIfEntryExists) != Self::CAPACITY 
+        self._find_index(key, FindIndexPurpose::FindIfEntryExists) != Self::CAPACITY
     }
 
     pub fn remove(&mut self, key: &K) -> Option<E> {
@@ -335,7 +361,7 @@ where
         }
     }
 
-    pub fn iter_tail(&self) -> MapIteratorImpl<'_, K, V, E, C,> {
+    pub fn iter_tail(&self) -> MapIteratorImpl<'_, K, V, E, C> {
         MapIteratorImpl {
             _remaining: self._size,
             _current: self._tail,
@@ -354,7 +380,7 @@ where
     _current: usize,
     _data: &'a Vec<Slot<E>>,
     _fn_next: fn(&E) -> usize,
-    _phantom: PhantomData<(K, V)>
+    _phantom: PhantomData<(K, V)>,
 }
 
 impl<'a, K: 'a, V: 'a, E: 'a, const C: usize> Iterator for MapIteratorImpl<'a, K, V, E, C>

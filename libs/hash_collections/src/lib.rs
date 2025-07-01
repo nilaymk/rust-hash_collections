@@ -7,10 +7,10 @@
 #![feature(inherent_associated_types)]
 
 mod check;
-mod hash_map_internal;
-pub mod hash_map;
 pub mod hash_graph;
+pub mod hash_map;
+mod hash_map_internal;
 
+pub use crate::hash_graph::FixedSizeHashGraphMap;
 pub use crate::hash_map::FixedSizeHashMap;
 pub use crate::hash_map::FixedSizeHashSet;
-pub use crate::hash_graph::FixedSizeHashGraphMap;

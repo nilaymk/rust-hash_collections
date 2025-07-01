@@ -5,7 +5,7 @@ struct Node {
 }
 
 struct Graph {
-    _nodes: Vec<Node>
+    _nodes: Vec<Node>,
 }
 
 impl Graph {
@@ -13,24 +13,36 @@ impl Graph {
         match self._nodes.iter().position(|node| *node.value == *value) {
             Some(i) => i,
             None => {
-                self._nodes.push(
-                    Node{value, connected_to: Vec::new(), connected_from: Vec::new(),}
-                );
-                let i = self._nodes.len()-1;
+                self._nodes.push(Node {
+                    value,
+                    connected_to: Vec::new(),
+                    connected_from: Vec::new(),
+                });
+                let i = self._nodes.len() - 1;
                 i
             }
         }
     }
-    
+
     fn add_nodes_and_connect(&mut self, value: String, connect_to: Vec<String>) {
         let index = self._insert_or_get(value);
         for target_value in connect_to {
             let target_index = self._insert_or_get(target_value);
             if index != target_index {
-                if self._nodes[index].connected_to.iter().any(|i| *i==target_index) == false {
+                if self._nodes[index]
+                    .connected_to
+                    .iter()
+                    .any(|i| *i == target_index)
+                    == false
+                {
                     self._nodes[index].connected_to.push(target_index);
                 }
-                if self._nodes[target_index].connected_from.iter().any(|i| *i==index) == false {
+                if self._nodes[target_index]
+                    .connected_from
+                    .iter()
+                    .any(|i| *i == index)
+                    == false
+                {
                     self._nodes[target_index].connected_from.push(index);
                 }
             }
@@ -39,7 +51,7 @@ impl Graph {
 }
 
 fn main() {
-    let mut graph = Graph{_nodes: Vec::new()};
+    let mut graph = Graph { _nodes: Vec::new() };
     // foo --> bar <--+
     //  ^  \          |
     //  |   +->  baz -+
@@ -50,9 +62,18 @@ fn main() {
     //    bat ----------+
     //
 
-    graph.add_nodes_and_connect("foo".to_string(), vec!["bar".to_string(), "baz".to_string()]);
-    graph.add_nodes_and_connect("baz".to_string(), vec!["bar".to_string(), "boo".to_string()]);
-    graph.add_nodes_and_connect("bat".to_string(), vec!["boo".to_string(), "foo".to_string()]);
+    graph.add_nodes_and_connect(
+        "foo".to_string(),
+        vec!["bar".to_string(), "baz".to_string()],
+    );
+    graph.add_nodes_and_connect(
+        "baz".to_string(),
+        vec!["bar".to_string(), "boo".to_string()],
+    );
+    graph.add_nodes_and_connect(
+        "bat".to_string(),
+        vec!["boo".to_string(), "foo".to_string()],
+    );
 
     println!("****************GRAPH**************");
 
@@ -64,4 +85,3 @@ fn main() {
         }
     }
 }
-

@@ -3,9 +3,8 @@
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::ops::{Index, IndexMut};
 
-
-use crate::hash_map_internal::{FixedSizeHashMapImpl, Entry};
 use crate::check::{Check, IsTrue, is_prime_and_within_limit};
+use crate::hash_map_internal::{Entry, FixedSizeHashMapImpl};
 
 pub use crate::hash_map_internal::{MapIteratorImpl, OutOfCapacityError};
 
@@ -17,14 +16,30 @@ pub struct MapEntry<K, V, const C: usize> {
 }
 
 impl<K, V, const C: usize> Entry<K, V, C> for MapEntry<K, V, C> {
-    fn key(&self) -> &K {&self._key}
-    fn value(&self) -> &V {&self._value}
-    fn consume_self(self) -> V {self._value}
-    fn mut_value(&mut self) -> &mut V {&mut self._value}
-    fn next(&self) -> usize {self._next}
-    fn mut_next(&mut self) -> &mut usize {&mut self._next}
-    fn prev(&self) -> usize {self._prev}
-    fn mut_prev(&mut self) -> &mut usize {&mut self._prev}
+    fn key(&self) -> &K {
+        &self._key
+    }
+    fn value(&self) -> &V {
+        &self._value
+    }
+    fn consume_self(self) -> V {
+        self._value
+    }
+    fn mut_value(&mut self) -> &mut V {
+        &mut self._value
+    }
+    fn next(&self) -> usize {
+        self._next
+    }
+    fn mut_next(&mut self) -> &mut usize {
+        &mut self._next
+    }
+    fn prev(&self) -> usize {
+        self._prev
+    }
+    fn mut_prev(&mut self) -> &mut usize {
+        &mut self._prev
+    }
     fn new(key: K, value: V) -> Self {
         Self {
             _key: key,
@@ -35,13 +50,13 @@ impl<K, V, const C: usize> Entry<K, V, C> for MapEntry<K, V, C> {
     }
 }
 
-pub struct FixedSizeHashMap<K, V, const C: usize, H=DefaultHasher>
+pub struct FixedSizeHashMap<K, V, const C: usize, H = DefaultHasher>
 where
     Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
 {
-    _hash_map_internal: FixedSizeHashMapImpl<K, V, C, H, MapEntry<K, V, C>>
+    _hash_map_internal: FixedSizeHashMapImpl<K, V, C, H, MapEntry<K, V, C>>,
 }
 
 impl<K, V, const C: usize, H> Default for FixedSizeHashMap<K, V, C, H>
@@ -75,7 +90,12 @@ where
         result.map(|rv| rv.1)
     }
 
-    pub fn insert_or<F: FnOnce(&mut V)>(&mut self, key: K, value: V, op: F) -> Result<(), OutOfCapacityError> {
+    pub fn insert_or<F: FnOnce(&mut V)>(
+        &mut self,
+        key: K,
+        value: V,
+        op: F,
+    ) -> Result<(), OutOfCapacityError> {
         if let Some(value) = self.get_mut(&key) {
             op(value);
             Ok(())
@@ -89,15 +109,21 @@ where
     }
 
     pub fn get(&self, key: &K) -> Option<&V> {
-        self._hash_map_internal.get_entry_and_index_of(key).map(|e| e.0.value())
+        self._hash_map_internal
+            .get_entry_and_index_of(key)
+            .map(|e| e.0.value())
     }
 
     pub fn get_mut(&mut self, key: &K) -> Option<&mut V> {
-         self._hash_map_internal.get_mut_entry_and_index_of(key).map(|e| e.0.mut_value())
+        self._hash_map_internal
+            .get_mut_entry_and_index_of(key)
+            .map(|e| e.0.mut_value())
     }
 
     pub fn remove(&mut self, key: &K) -> Option<V> {
-        self._hash_map_internal.remove(key).map(|e| e.consume_self())
+        self._hash_map_internal
+            .remove(key)
+            .map(|e| e.consume_self())
     }
 
     pub const fn capacity(&self) -> usize {
@@ -110,7 +136,6 @@ where
 
     pub fn head(&self) -> Option<(&K, &V)> {
         self._hash_map_internal.head().map(|e| (e.key(), e.value()))
-
     }
 
     pub fn tail(&self) -> Option<(&K, &V)> {
@@ -119,13 +144,13 @@ where
 
     pub fn iter_head(&self) -> MapIter<'_, K, V, C> {
         MapIter {
-            _inner_iter: self._hash_map_internal.iter_head()
+            _inner_iter: self._hash_map_internal.iter_head(),
         }
     }
 
     pub fn iter_tail(&self) -> MapIter<'_, K, V, C> {
         MapIter {
-            _inner_iter: self._hash_map_internal.iter_tail()
+            _inner_iter: self._hash_map_internal.iter_tail(),
         }
     }
 }
@@ -154,22 +179,23 @@ where
 }
 
 pub struct MapIter<'a, K: 'a, V: 'a, const C: usize> {
-    _inner_iter: MapIteratorImpl<'a, K, V, MapEntry<K, V, C>, C>
+    _inner_iter: MapIteratorImpl<'a, K, V, MapEntry<K, V, C>, C>,
 }
 
-impl<'a, K: 'a, V: 'a, const C: usize> Iterator for MapIter<'a, K, V, C>
-where
-{
+impl<'a, K: 'a, V: 'a, const C: usize> Iterator for MapIter<'a, K, V, C> {
     type Item = (&'a K, &'a V);
 
     fn next(&mut self) -> Option<Self::Item> {
         self._inner_iter.next().map(|e| (e.key(), e.value()))
     }
 
-    fn size_hint(&self) -> (usize, Option<usize>) {self._inner_iter.size_hint()}
+    fn size_hint(&self) -> (usize, Option<usize>) {
+        self._inner_iter.size_hint()
+    }
 
-    fn count(self) -> usize {self._inner_iter.count()}
+    fn count(self) -> usize {
+        self._inner_iter.count()
+    }
 }
-
 
 pub type FixedSizeHashSet<K, const C: usize> = FixedSizeHashMap<K, (), C>;
