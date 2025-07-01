@@ -13,3 +13,4 @@ pub mod hash_graph;
 
 pub use crate::hash_map::FixedSizeHashMap;
 pub use crate::hash_map::FixedSizeHashSet;
+pub use crate::hash_graph::FixedSizeHashGraphMap;
