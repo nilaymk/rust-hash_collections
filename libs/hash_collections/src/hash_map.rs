@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::ops::{Index, IndexMut};
 
@@ -5,7 +7,7 @@ use std::ops::{Index, IndexMut};
 use crate::hash_map_internal::{FixedSizeHashMapImpl, Entry};
 use crate::check::{Check, IsTrue, is_prime_and_within_limit};
 
-pub use crate::hash_map_internal::{MapIteratorImpl as MapIterator, OutOfCapacityError};
+pub use crate::hash_map_internal::{MapIteratorImpl, OutOfCapacityError};
 
 pub struct MapEntry<K, V, const C: usize> {
     _key: K,
@@ -115,12 +117,16 @@ where
         self._hash_map_internal.tail().map(|e| (e.key(), e.value()))
     }
 
-    pub fn iter_head(&self) -> MapIterator<'_, K, V, MapEntry<K, V, C>, C, impl Fn(&MapEntry<K, V, C>) -> usize + use<K, V, C, H>> {
-        self._hash_map_internal.iter_head()
+    pub fn iter_head(&self) -> MapIter<'_, K, V, C> {
+        MapIter {
+            _inner_iter: self._hash_map_internal.iter_head()
+        }
     }
 
-    pub fn iter_tail(&self) -> MapIterator<'_, K, V, MapEntry<K, V, C>, C, impl Fn(&MapEntry<K, V, C>) -> usize + use<K, V, C, H>> {
-        self._hash_map_internal.iter_tail()
+    pub fn iter_tail(&self) -> MapIter<'_, K, V, C> {
+        MapIter {
+            _inner_iter: self._hash_map_internal.iter_tail()
+        }
     }
 }
 
@@ -146,5 +152,24 @@ where
         self.get_mut(key).expect("Panic! not in map")
     }
 }
+
+pub struct MapIter<'a, K: 'a, V: 'a, const C: usize> {
+    _inner_iter: MapIteratorImpl<'a, K, V, MapEntry<K, V, C>, C>
+}
+
+impl<'a, K: 'a, V: 'a, const C: usize> Iterator for MapIter<'a, K, V, C>
+where
+{
+    type Item = (&'a K, &'a V);
+
+    fn next(&mut self) -> Option<Self::Item> {
+        self._inner_iter.next().map(|e| (e.key(), e.value()))
+    }
+
+    fn size_hint(&self) -> (usize, Option<usize>) {self._inner_iter.size_hint()}
+
+    fn count(self) -> usize {self._inner_iter.count()}
+}
+
 
 pub type FixedSizeHashSet<K, const C: usize> = FixedSizeHashMap<K, (), C>;

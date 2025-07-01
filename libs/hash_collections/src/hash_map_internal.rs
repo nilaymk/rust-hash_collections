@@ -1,3 +1,5 @@
+#![allow(dead_code)]
+
 use std::hash::{Hash, Hasher};
 use std::marker::PhantomData;
 use std::mem;
@@ -96,7 +98,7 @@ where
     H: Default + Hasher,
     E: Entry<K, V, C>
 {
-    pub fn get_index_of(&mut self, key: &K) -> Option<usize> {
+    pub fn get_index_of(&self, key: &K) -> Option<usize> {
         let i = self._find_index(key, true);
         if i != Self::CAPACITY && self._data[i].is_occupied() {Some(i)} else {None}
     }
@@ -145,7 +147,6 @@ where
         match self._data[i] {
             Slot::IsOccupiedBy(ref mut entry) => {
                 old_val = Some(mem::replace(entry.mut_value(), value));
-                self._remove_from_list(i);
                 self._move_to_back_of_list(i);
             }
             Slot::Empty | Slot::WasOccupied => {
@@ -155,8 +156,7 @@ where
                     *e.mut_next() = Self::CAPACITY;
                     e
                 });
-                self._move_to_back_of_list(i);
-                self._size += 1;
+                self._add_to_list(i);
             }
         }
 
@@ -182,27 +182,8 @@ where
         index
     }
 
-    fn _move_to_front_of_list(&mut self, i: usize) {
-        if self._size == 0 {
-            debug_assert!(self._head == Self::CAPACITY && self._tail == Self::CAPACITY);
-            self._head = i;
-            self._tail = i;
-        } else {
-            if let Slot::IsOccupiedBy(ref mut entry) = self._data[self._head] {
-                *entry.mut_prev() = i;
-            }
-
-            if let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
-                *entry.mut_next() = self._head;
-                *entry.mut_prev() = Self::CAPACITY;
-            }
-
-            self._head = i;
-        }
-    }
-
-    fn _move_to_back_of_list(&mut self, i: usize) {
-        if self._size == 0 {
+    fn _add_to_list(&mut self, i: usize) {
+        if self._size == 0{
             debug_assert!(self._head == Self::CAPACITY && self._tail == Self::CAPACITY);
             self._head = i;
             self._tail = i;
@@ -218,36 +199,65 @@ where
 
             self._tail = i;
         }
+        self._size+=1;
+    }
+
+    fn _move_to_back_of_list(&mut self, i: usize) {
+        debug_assert!(self._size != 0);
+
+        if self._size > 1 {
+            if let Slot::IsOccupiedBy(ref mut tail_entry) = self._data[self._tail] {
+                *tail_entry.mut_next() = i;
+            }
+
+            if let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
+                *entry.mut_prev() = self._tail;
+                *entry.mut_next() = Self::CAPACITY;
+            }
+
+            self._tail = i;
+        }
     }
 
     fn _remove_from_list(&mut self, i: usize) {
-        let mut entry_next = Self::CAPACITY;
-        let mut entry_prev = Self::CAPACITY;
+        debug_assert!(self._size != 0);
+        if self._size == 1 {
+            self._head = Self::CAPACITY;
+            self._tail = Self::CAPACITY;
+        } else {
+            let mut entry_next = Self::CAPACITY;
+            let mut entry_prev = Self::CAPACITY;
 
-        match self._data[i] {
-            Slot::IsOccupiedBy(ref entry) => {
-                entry_next = entry.next();
-                entry_prev = entry.prev();
-            }
-            _ => {}
-        }
-
-        if entry_prev != Self::CAPACITY {
-            match self._data[entry_prev] {
-                Slot::IsOccupiedBy(ref mut entry) => *entry.mut_next() = entry_next,
+            match self._data[i] {
+                Slot::IsOccupiedBy(ref entry) => {
+                    entry_next = entry.next();
+                    entry_prev = entry.prev();
+                }
                 _ => {}
             }
-        } else {
-            self._head = entry_next;
-        }
 
-        if entry_next != Self::CAPACITY {
-            match self._data[entry_next] {
-                Slot::IsOccupiedBy(ref mut entry) => *entry.mut_prev() = entry_prev,
-                _ => {}
+            if entry_prev != Self::CAPACITY {
+                match self._data[entry_prev] {
+                    Slot::IsOccupiedBy(ref mut entry) => *entry.mut_next() = entry_next,
+                    _ => {}
+                }
+            } else {
+                self._head = entry_next;
             }
-        } else {
-            self._tail = entry_prev;
+
+            if entry_next != Self::CAPACITY {
+                match self._data[entry_next] {
+                    Slot::IsOccupiedBy(ref mut entry) => *entry.mut_prev() = entry_prev,
+                    _ => {}
+                }
+            } else {
+                self._tail = entry_prev;
+            }
+        }
+        self._size-=1;
+        if let Slot::IsOccupiedBy(ref mut entry) = self._data[i] {
+            *entry.mut_next() = Self::CAPACITY;
+            *entry.mut_next() = Self::CAPACITY;
         }
     }
 }
@@ -285,7 +295,6 @@ where
             return None;
         }
 
-        self._size -= 1;
         self._remove_from_list(i);
 
         self._data[i].take()
@@ -315,7 +324,7 @@ where
         self.get_mut_entry_at(self._tail)
     }
 
-    pub fn iter_head(&self) -> MapIteratorImpl<'_, K, V, E, C, impl Fn(&E) -> usize + use<K, V, C, H, E>> {
+    pub fn iter_head(&self) -> MapIteratorImpl<'_, K, V, E, C> {
         MapIteratorImpl {
             _remaining: self._size,
             _current: self._head,
@@ -325,7 +334,7 @@ where
         }
     }
 
-    pub fn iter_tail(&self) -> MapIteratorImpl<'_, K, V, E, C, impl Fn(&E) -> usize + use<K, V, C, H, E>> {
+    pub fn iter_tail(&self) -> MapIteratorImpl<'_, K, V, E, C,> {
         MapIteratorImpl {
             _remaining: self._size,
             _current: self._tail,
@@ -336,24 +345,22 @@ where
     }
 }
 
-pub struct MapIteratorImpl<'a, K: 'a, V: 'a, E: 'a, const C: usize, Next>
+pub struct MapIteratorImpl<'a, K: 'a, V: 'a, E: 'a, const C: usize>
 where
-    Next: Fn(&E) -> usize,
-    E: Entry<K, V, C>
+    E: Entry<K, V, C>,
 {
     _remaining: usize,
     _current: usize,
     _data: &'a Vec<Slot<E>>,
-    _fn_next: Next,
+    _fn_next: fn(&E) -> usize,
     _phantom: PhantomData<(K, V)>
 }
 
-impl<'a, K: 'a, V: 'a, E: 'a, const C: usize, Next> Iterator for MapIteratorImpl<'a, K, V, E, C, Next>
+impl<'a, K: 'a, V: 'a, E: 'a, const C: usize> Iterator for MapIteratorImpl<'a, K, V, E, C>
 where
     E: Entry<K, V, C>,
-    Next: Fn(&E) -> usize,
 {
-    type Item = (&'a K, &'a V);
+    type Item = &'a E;
 
     fn next(&mut self) -> Option<Self::Item> {
         if self._current < C
@@ -361,7 +368,7 @@ where
         {
             self._remaining -= 1;
             self._current = (self._fn_next)(entry);
-            Some((entry.key(), entry.value()))
+            Some(entry)
         } else {
             None
         }

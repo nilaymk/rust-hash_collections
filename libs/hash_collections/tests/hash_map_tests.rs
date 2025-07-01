@@ -164,3 +164,13 @@ fn forward_iteration() {
     assert_eq!(iter.next(), None);
     assert_eq!(iter.next(), None);
 }
+
+#[test]
+fn insert_same_item_multiple_times() {
+    let mut mymap = FixedSizeHashMap::<u64, u32, 13>::new();
+    _ = mymap.insert(5, 1);
+    _ = mymap.insert(5, 2);
+    _ = mymap.insert(5, 3);
+
+    assert_eq!(mymap[&5], 3)
+}
