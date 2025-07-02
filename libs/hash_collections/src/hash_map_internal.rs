@@ -54,7 +54,7 @@ pub(crate) trait Entry<K, V, const C: usize> {
 
 pub(crate) struct FixedSizeHashMapImpl<K, V, const C: usize, H, E>
 where
-    Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
+    Check<{ is_prime_and_within_limit(C, crate::MAX_CAPACITY) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
     E: Entry<K, V, C>,
@@ -68,7 +68,7 @@ where
 
 impl<K, V, const C: usize, H, E> Default for FixedSizeHashMapImpl<K, V, C, H, E>
 where
-    Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
+    Check<{ is_prime_and_within_limit(C, crate::MAX_CAPACITY) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
     E: Entry<K, V, C>,
@@ -87,7 +87,7 @@ enum FindIndexPurpose {
 // hash_map Internals
 impl<K, V, const C: usize, H, E> FixedSizeHashMapImpl<K, V, C, H, E>
 where
-    Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
+    Check<{ is_prime_and_within_limit(C, crate::MAX_CAPACITY) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
     E: Entry<K, V, C>,
@@ -191,7 +191,7 @@ where
 
 impl<K, V, const C: usize, H, E> FixedSizeHashMapImpl<K, V, C, H, E>
 where
-    Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
+    Check<{ is_prime_and_within_limit(C, crate::MAX_CAPACITY) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
     E: Entry<K, V, C>,

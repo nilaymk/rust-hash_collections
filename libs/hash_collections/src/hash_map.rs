@@ -53,7 +53,7 @@ impl<K, V, const C: usize> Entry<K, V, C> for MapEntry<K, V, C> {
 
 pub struct FixedSizeHashMap<K, V, const C: usize, H = DefaultHasher>
 where
-    Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
+    Check<{ is_prime_and_within_limit(C, crate::MAX_CAPACITY) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
 {
@@ -62,7 +62,7 @@ where
 
 impl<K, V, const C: usize, H> Default for FixedSizeHashMap<K, V, C, H>
 where
-    Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
+    Check<{ is_prime_and_within_limit(C, crate::MAX_CAPACITY) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
 {
@@ -73,7 +73,7 @@ where
 
 impl<K, V, const C: usize, H> FixedSizeHashMap<K, V, C, H>
 where
-    Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
+    Check<{ is_prime_and_within_limit(C, crate::MAX_CAPACITY) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
 {
@@ -164,7 +164,7 @@ where
 
 impl<'a, K: 'a, V: 'a, const C: usize, H> Index<&K> for FixedSizeHashMap<K, V, C, H>
 where
-    Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
+    Check<{ is_prime_and_within_limit(C, crate::MAX_CAPACITY) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
 {
@@ -176,7 +176,7 @@ where
 
 impl<K, V, const C: usize, H> IndexMut<&K> for FixedSizeHashMap<K, V, C, H>
 where
-    Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
+    Check<{ is_prime_and_within_limit(C, crate::MAX_CAPACITY) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
 {

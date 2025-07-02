@@ -64,7 +64,7 @@ impl<K, V, const C: usize> Entry<K, V, C> for NodeEntry<K, V, C> {
 
 pub struct Node<'a, K, V, const C: usize, H>
 where
-    Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
+    Check<{ is_prime_and_within_limit(C, crate::MAX_CAPACITY) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
 {
@@ -74,7 +74,7 @@ where
 
 impl<'a, K, V, const C: usize, H> Node<'a, K, V, C, H>
 where
-    Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
+    Check<{ is_prime_and_within_limit(C, crate::MAX_CAPACITY) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
 {
@@ -104,7 +104,7 @@ where
 
 pub struct EdgeIter<'a, K, V, const C: usize, H>
 where
-    Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
+    Check<{ is_prime_and_within_limit(C, crate::MAX_CAPACITY) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
 {
@@ -114,7 +114,7 @@ where
 
 impl<'a, K, V, const C: usize, H> Iterator for EdgeIter<'a, K, V, C, H>
 where
-    Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
+    Check<{ is_prime_and_within_limit(C, crate::MAX_CAPACITY) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
 {
@@ -149,7 +149,7 @@ where
 
 pub struct FixedSizeHashGraphImpl<K, V, const C: usize, H>
 where
-    Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
+    Check<{ is_prime_and_within_limit(C, crate::MAX_CAPACITY) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
 {
@@ -160,7 +160,7 @@ where
 
 impl<'a, K: 'a, V: 'a, const C: usize, H> FixedSizeHashGraphImpl<K, V, C, H>
 where
-    Check<{ is_prime_and_within_limit(C, 25013) }>: IsTrue,
+    Check<{ is_prime_and_within_limit(C, crate::MAX_CAPACITY) }>: IsTrue,
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
 {

@@ -13,6 +13,8 @@ pub mod hash_graph;
 pub mod hash_map;
 pub mod errors;
 
+const MAX_CAPACITY: usize = 50849;
+
 pub use crate::hash_graph::FixedSizeHashGraphMap;
 pub use crate::hash_map::FixedSizeHashMap;
 pub use crate::hash_map::FixedSizeHashSet;

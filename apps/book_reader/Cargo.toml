@@ -1,0 +1,8 @@
+[package]
+name = "book_reader"
+version = "0.1.0"
+edition = "2024"
+
+[dependencies]
+hash_collections = {"path" = "../../libs/hash_collections"}
+regex = "1.11.1"

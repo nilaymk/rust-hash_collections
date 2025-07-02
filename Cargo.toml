@@ -1,3 +1,3 @@
 [workspace]
 resolver="3"
-members = ["libs/hash_collections"]
+members = ["apps/book_reader", "libs/hash_collections"]
