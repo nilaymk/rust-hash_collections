@@ -92,89 +92,6 @@ where
     H: Default + Hasher,
     E: Entry<K, V, C>,
 {
-    pub fn get_index_of(&self, key: &K) -> Option<usize> {
-        let i = self._find_index(key, FindIndexPurpose::FindIfEntryExists);
-        if i != Self::CAPACITY && self._data[i].is_occupied() {
-            Some(i)
-        } else {
-            None
-        }
-    }
-
-    pub fn get_mut_entry_and_index_of(&mut self, key: &K) -> Option<(&mut E, usize)> {
-        let i = self._find_index(key, FindIndexPurpose::FindIfEntryExists);
-        if i != Self::CAPACITY
-            && let Slot::IsOccupiedBy(ref mut entry) = self._data[i]
-        {
-            Some((entry, i))
-        } else {
-            None
-        }
-    }
-
-    pub fn get_entry_and_index_of(&self, key: &K) -> Option<(&E, usize)> {
-        let i = self._find_index(key, FindIndexPurpose::FindIfEntryExists);
-        if i != Self::CAPACITY
-            && let Slot::IsOccupiedBy(ref entry) = self._data[i]
-        {
-            Some((entry, i))
-        } else {
-            None
-        }
-    }
-
-    pub fn get_mut_entry_at(&mut self, i: usize) -> Option<&mut E> {
-        if i != Self::CAPACITY
-            && let Slot::IsOccupiedBy(ref mut entry) = self._data[i]
-        {
-            Some(entry)
-        } else {
-            None
-        }
-    }
-
-    pub fn get_entry_at(&self, i: usize) -> Option<&E> {
-        if i != Self::CAPACITY
-            && let Slot::IsOccupiedBy(ref entry) = self._data[i]
-        {
-            Some(entry)
-        } else {
-            None
-        }
-    }
-
-    pub fn insert_get_index(
-        &mut self,
-        key: K,
-        value: V,
-    ) -> Result<(usize, Option<V>), OutOfCapacityError> {
-        let i = self._find_index(&key, FindIndexPurpose::FindSlotForInsertion);
-        if i == Self::CAPACITY {
-            return Result::Err(OutOfCapacityError {
-                capacity: Self::CAPACITY,
-            });
-        }
-
-        let mut old_val: Option<V> = None;
-        match self._data[i] {
-            Slot::IsOccupiedBy(ref mut entry) => {
-                old_val = Some(mem::replace(entry.mut_value(), value));
-                self._move_to_back_of_list(i);
-            }
-            Slot::Empty | Slot::WasOccupied => {
-                self._data[i] = Slot::IsOccupiedBy({
-                    let mut e = E::new(key, value);
-                    *e.mut_next() = Self::CAPACITY;
-                    *e.mut_next() = Self::CAPACITY;
-                    e
-                });
-                self._add_to_list(i);
-            }
-        }
-
-        Result::Ok((i, old_val))
-    }
-
     fn _find_index(&self, key: &K, purpose: FindIndexPurpose) -> usize {
         let mut hash_state: Self::_Hash = Default::default();
         key.hash(&mut hash_state);
@@ -282,6 +199,16 @@ where
     pub const CAPACITY: usize = C;
     type _Hash = H;
 
+    pub fn placeholder() -> FixedSizeHashMapImpl<K, V, C, H, E> {
+        FixedSizeHashMapImpl::<K, V, C, H, E> {
+            _data: Vec::new(),
+            _size: 0,
+            _head: Self::CAPACITY,
+            _tail: Self::CAPACITY,
+            _phantom: PhantomData::<(K, V, H)>{},
+        }
+    }
+
     pub fn new() -> FixedSizeHashMapImpl<K, V, C, H, E> {
         let mut map = FixedSizeHashMapImpl::<K, V, C, H, E> {
             _data: Vec::new(),
@@ -292,6 +219,89 @@ where
         };
         map._data.resize_with(Self::CAPACITY, Default::default);
         map
+    }
+
+    pub fn get_index_of(&self, key: &K) -> Option<usize> {
+        let i = self._find_index(key, FindIndexPurpose::FindIfEntryExists);
+        if i != Self::CAPACITY && self._data[i].is_occupied() {
+            Some(i)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_mut_entry_and_index_of(&mut self, key: &K) -> Option<(&mut E, usize)> {
+        let i = self._find_index(key, FindIndexPurpose::FindIfEntryExists);
+        if i != Self::CAPACITY
+            && let Slot::IsOccupiedBy(ref mut entry) = self._data[i]
+        {
+            Some((entry, i))
+        } else {
+            None
+        }
+    }
+
+    pub fn get_entry_and_index_of(&self, key: &K) -> Option<(&E, usize)> {
+        let i = self._find_index(key, FindIndexPurpose::FindIfEntryExists);
+        if i != Self::CAPACITY
+            && let Slot::IsOccupiedBy(ref entry) = self._data[i]
+        {
+            Some((entry, i))
+        } else {
+            None
+        }
+    }
+
+    pub fn get_mut_entry_at(&mut self, i: usize) -> Option<&mut E> {
+        if i != Self::CAPACITY
+            && let Slot::IsOccupiedBy(ref mut entry) = self._data[i]
+        {
+            Some(entry)
+        } else {
+            None
+        }
+    }
+
+    pub fn get_entry_at(&self, i: usize) -> Option<&E> {
+        if i != Self::CAPACITY
+            && let Slot::IsOccupiedBy(ref entry) = self._data[i]
+        {
+            Some(entry)
+        } else {
+            None
+        }
+    }
+
+    pub fn insert_get_index(
+        &mut self,
+        key: K,
+        value: V,
+    ) -> Result<(usize, Option<V>), OutOfCapacityError> {
+        let i = self._find_index(&key, FindIndexPurpose::FindSlotForInsertion);
+        if i == Self::CAPACITY {
+            return Result::Err(OutOfCapacityError {
+                capacity: Self::CAPACITY,
+            });
+        }
+
+        let mut old_val: Option<V> = None;
+        match self._data[i] {
+            Slot::IsOccupiedBy(ref mut entry) => {
+                old_val = Some(mem::replace(entry.mut_value(), value));
+                self._move_to_back_of_list(i);
+            }
+            Slot::Empty | Slot::WasOccupied => {
+                self._data[i] = Slot::IsOccupiedBy({
+                    let mut e = E::new(key, value);
+                    *e.mut_next() = Self::CAPACITY;
+                    *e.mut_next() = Self::CAPACITY;
+                    e
+                });
+                self._add_to_list(i);
+            }
+        }
+
+        Result::Ok((i, old_val))
     }
 
     pub fn exists(&self, key: &K) -> bool {

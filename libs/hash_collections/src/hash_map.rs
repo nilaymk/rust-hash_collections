@@ -79,6 +79,12 @@ where
 {
     const CAPACITY: usize = C;
     type _Hash = H;
+    
+    pub fn placeholder() -> FixedSizeHashMap<K, V, C, H> {
+        FixedSizeHashMap::<K, V, C, H> {
+            _hash_map_internal: FixedSizeHashMapImpl::placeholder(),
+        }
+    }
 
     pub fn new() -> FixedSizeHashMap<K, V, C, H> {
         FixedSizeHashMap::<K, V, C, H> {

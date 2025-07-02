@@ -5,6 +5,7 @@ use crate::{
     hash_map_internal::{Entry, FixedSizeHashMapImpl},
     OutOfCapacityError
 };
+
 use std::hash::{DefaultHasher, Hash, Hasher};
 use std::mem;
 
@@ -77,7 +78,7 @@ where
     K: Hash + std::cmp::Eq,
     H: Default + Hasher,
 {
-    pub fn out_edges(&self) -> EdgeIter<'_, K, V, C, H> {
+    pub fn iter_out_edges(&self) -> EdgeIter<'_, K, V, C, H> {
         EdgeIter {
             _inner_iter: self._node_entry._out_edges.iter_head(),
             _graph: self._graph,
@@ -153,6 +154,8 @@ where
     H: Default + Hasher,
 {
     _hash_map: FixedSizeHashMapImpl<K, V, C, H, NodeEntry<K, V, C>>,
+    _empty_out_edges: OutEdges,
+    _empty_in_edges: InEdges,
 }
 
 impl<'a, K: 'a, V: 'a, const C: usize, H> FixedSizeHashGraphImpl<K, V, C, H>
@@ -164,6 +167,8 @@ where
     pub fn new() -> Self {
         Self {
             _hash_map: Default::default(),
+            _empty_in_edges: InEdges::placeholder(),
+            _empty_out_edges: OutEdges::placeholder()
         }
     }
 
@@ -296,9 +301,35 @@ where
             .get_entry_and_index_of(key)
             .map(|(e, _)| Node {
                 _node_entry: e,
-                _graph: self,
+                _graph: &self,
             })
     }
+
+    pub fn iter_out_edges(&self, k: &K) -> EdgeIter<'_, K, V, C, H> {
+        if let Some((node_entry, _)) = self._hash_map.get_entry_and_index_of(k) {
+            EdgeIter {
+                _inner_iter: node_entry._out_edges.iter_head(),
+                _graph: &self,
+            }     
+        } else {
+            EdgeIter {
+                _inner_iter: self._empty_out_edges.iter_head(),
+                _graph: &self,
+            }       
+        }
+    }
+
+    pub fn out_edge_weight(&self, from_key: &K, to_key: &K) -> u32 {
+        self._hash_map.get_entry_and_index_of(from_key)
+            .map_or(0, |(node_entry, _)| {
+                self._hash_map.get_index_of(to_key).map_or(
+                    0, |to_index| node_entry._out_edges.get(&to_index).map_or(
+                        0, |weight| *weight
+                    )
+                )
+            })
+    }
+
 }
 
 pub type FixedSizeHashGraphMap<K, V, const C: usize> =
