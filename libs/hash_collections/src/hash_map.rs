@@ -204,5 +204,3 @@ impl<'a, K: 'a, V: 'a, const C: usize> Iterator for MapIter<'a, K, V, C> {
         self._inner_iter.count()
     }
 }
-
-pub type FixedSizeHashSet<K, const C: usize> = FixedSizeHashMap<K, (), C>;

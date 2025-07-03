@@ -1,7 +1,8 @@
 #![allow(dead_code)]
 
 use crate::{
-    hash_map::{MapIter, FixedSizeHashMap, FixedSizeHashSet},
+    hash_map::{MapIter, FixedSizeHashMap},
+    hash_set::{FixedSizeHashSet},
     hash_map_internal::{Entry, FixedSizeHashMapImpl},
     OutOfCapacityError
 };
@@ -206,7 +207,7 @@ where
             }
 
             if let Some(to_node) = self._hash_map.get_mut_entry_at(to_index) {
-                let _ = to_node._in_edges.insert(index, ());
+                let _ = to_node._in_edges.insert(index);
             }
         }
 
@@ -229,7 +230,7 @@ where
                         .insert_or(to_index, 1, |weight| *weight += 1);
                 }
                 if let Some(to_node) = self._hash_map.get_mut_entry_at(to_index) {
-                    let _ = to_node._in_edges.insert(index, ());
+                    let _ = to_node._in_edges.insert(index);
                 }
             }
         }
@@ -252,7 +253,7 @@ where
             }
         }
 
-        for (from_index, _) in from_nodes.iter_head() {
+        for from_index in from_nodes.iter_head() {
             if let Some(from_node) = self._hash_map.get_mut_entry_at(*from_index) {
                 from_node._out_edges.remove(&index);
             };

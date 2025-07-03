@@ -1,13 +1,9 @@
-use hash_collections::{FixedSizeHashGraphMap};
+use hash_collections;
 
 use std::error::Error;
 use std::fs::File;
 use std::io::{self, BufRead, BufReader, ErrorKind, Write};
 use std::collections::LinkedList;
-
-
-use regex::Regex;
-
 
 enum Sentence {
     Complete(String),
