@@ -11,8 +11,8 @@ fn add_some_data(set: &mut MySet, num: usize) {
         .enumerate()
         .filter(|(i, _)| *i < num)
         .for_each(
-            |(i, k)| {
-                assert!(set.insert(keys[i].to_string()).is_ok());
+            |(_, k)| {
+                assert!(set.insert(k.to_string()).is_ok());
             }
         );
 }
